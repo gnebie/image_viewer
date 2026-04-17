@@ -140,12 +140,12 @@ class App(tk.Tk):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
 
-        self._root = ttk.Frame(self, padding=8)
-        self._root.grid(row=0, column=0, sticky="nsew")
-        self._root.columnconfigure(0, weight=1)
-        self._root.rowconfigure(0, weight=1)
+        self._main_frame = ttk.Frame(self, padding=8)
+        self._main_frame.grid(row=0, column=0, sticky="nsew")
+        self._main_frame.columnconfigure(0, weight=1)
+        self._main_frame.rowconfigure(0, weight=1)
 
-        self._content = ttk.Frame(self._root)
+        self._content = ttk.Frame(self._main_frame)
         self._content.grid(row=0, column=0, sticky="nsew")
         self._content.columnconfigure(0, weight=1)
         self._content.rowconfigure(0, weight=1)
@@ -213,7 +213,7 @@ class App(tk.Tk):
         self._log_label.grid(row=0, column=0, sticky="nsew")
         self._toast = ToastOverlay(self._content)
 
-        self._bottom = ttk.Frame(self._root)
+        self._bottom = ttk.Frame(self._main_frame)
         self._bottom.grid(row=1, column=0, sticky="ew", pady=(8, 0))
         self._bottom.columnconfigure(2, weight=1)
 
@@ -722,7 +722,7 @@ class App(tk.Tk):
                 self._gallery_saved_index, len(self._slideshow.images)
             )
         self._slideshow_view = "image"
-        self._canvas.lift()
+        tk.Misc.lift(self._canvas)
         self._gallery_outer.lower()
         self._show_current_image()
         self._update_mode_banner()
@@ -739,7 +739,7 @@ class App(tk.Tk):
         self._gallery_outer.lower()
         self._hide_help_overlay()
         self._hide_log_overlay()
-        self._canvas.lower()
+        tk.Misc.lower(self._canvas)
         self._browser_frame.lift()
 
         try:
@@ -778,7 +778,9 @@ class App(tk.Tk):
                 self._update_organize_panel()
                 self._set_organize_browser_status()
             else:
-            self._set_status("Mode navigation: ↑↓ selectionner, →/Entree ouvrir, ← remonter, filtre actif, Esc quitter")
+                self._set_status(
+                    "Mode navigation: ↑↓ selectionner, →/Entree ouvrir, ← remonter, filtre actif, Esc quitter"
+                )
             self._update_mode_banner()
             self._render_organize_highlights()
         except (OSError, PermissionError) as e:
@@ -896,7 +898,7 @@ class App(tk.Tk):
         self._browser_frame.lower()
         self._gallery.unbind_interaction()
         self._gallery_outer.lower()
-        self._canvas.lift()
+        tk.Misc.lift(self._canvas)
         self._update_mode_banner()
         self._set_status(
             "Mode diaporama: Page_Up galerie, ← → images, ↑ ↓ debut/fin, ? aide, Esc navigation"

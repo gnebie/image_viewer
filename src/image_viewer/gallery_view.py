@@ -113,11 +113,30 @@ class SlideshowGalleryView(ttk.Frame):
         selection_index: int,
         thumb_level: int,
     ) -> None:
+        previous_key: Optional[tuple[str, str]] = None
+        if self._images and 0 <= self._selection < len(self._images):
+            previous_key = self._entry_key(self._images[self._selection])
+
         self._source = source
         self._images = images
-        self._selection = max(0, min(selection_index, len(images) - 1)) if images else 0
+        if images:
+            if previous_key is not None:
+                for idx, entry in enumerate(images):
+                    if self._entry_key(entry) == previous_key:
+                        self._selection = idx
+                        break
+                else:
+                    self._selection = max(0, min(selection_index, len(images) - 1))
+            else:
+                self._selection = max(0, min(selection_index, len(images) - 1))
+        else:
+            self._selection = 0
         self.set_thumb_level(thumb_level)
         self._full_rebuild()
+
+    @staticmethod
+    def _entry_key(entry: ImageEntry) -> tuple[str, str]:
+        return (str(entry.path), entry.member or "")
 
     def get_selection(self) -> int:
         return self._selection

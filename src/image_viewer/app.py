@@ -88,6 +88,7 @@ Mode tri (navigation, focus listbox)
   Esc            quitter le mode tri
 
 Divers
+  f              plein ecran on/off
   l              afficher/masquer le journal des operations (navigation)
   Ctrl+K         configurer les hotkeys
   g / j / t      etiqueter image courante (garder/jeter/a_trier) en diaporama
@@ -247,6 +248,7 @@ class App(tk.Tk):
         self.bind("<Next>", self._on_page_down)
         self.bind("<KP_Multiply>", self._on_star)
         self.bind("<Shift-Key-8>", self._on_star)
+        self.bind("f", self._on_fullscreen_toggle)
         self.bind("l", self._on_log_overlay)
         self.bind("g", self._on_review_keep)
         self.bind("j", self._on_review_drop)
@@ -1269,6 +1271,16 @@ class App(tk.Tk):
         self._settings.thumbnail_size_level = DEFAULT_THUMBNAIL_LEVEL
         self._schedule_save_settings()
         self._set_status("Taille vignettes: niveau par defaut")
+        return "break"
+
+    def _on_fullscreen_toggle(self, _evt=None):
+        try:
+            is_fullscreen = bool(self.attributes("-fullscreen"))
+        except tk.TclError:
+            is_fullscreen = False
+        next_state = not is_fullscreen
+        self.attributes("-fullscreen", next_state)
+        self._set_status("Plein ecran: ON" if next_state else "Plein ecran: OFF")
         return "break"
 
     def _on_resize(self, _evt=None) -> None:

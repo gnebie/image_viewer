@@ -1,0 +1,20 @@
+{
+  "thumbnail_size_level": 5,
+  "onboarding_done": false,
+  "folder_shortcuts": {
+    "1": "/chemin/vers/dossier"
+  },
+  "hotkeys": {
+    "enter_organize_mode": "d",
+    "organize_target_image": "i",
+    "organize_target_zip": "d",
+    "organize_op_move": "m",
+    "organize_op_copy": "c"
+  },
+  "sorting_rules": [
+    {
+      "ext": ".jpg",
+      "destination": "/chemin/vers/photos_jpg"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "image-viewer"
+version = "0.4.0"
+description = "Simple image and zip slideshow browser"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+  {name = "image_viewer contributors"},
+]
+keywords = ["images", "slideshow", "tkinter", "zip", "desktop"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Multimedia :: Graphics :: Viewers",
+]
+dependencies = [
+  "Pillow",
+]
+
+[project.urls]
+Homepage = "https://github.com/gnebie/image_viewer"
+Repository = "https://github.com/gnebie/image_viewer"
+Issues = "https://github.com/gnebie/image_viewer/issues"
+
+[project.scripts]
+image-viewer = "image_viewer.app:run_with_error_boundary"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

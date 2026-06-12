@@ -244,6 +244,7 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
             self._schedule_save_settings()
         self._refresh_browser()
         self.after(10, lambda: self._auto_open_start(start_path))
+        self.after(50, lambda: self._mode == "browser" and self._listbox.focus_set())
 
     # ------------------------------------------------------------------ #
     # Startup                                                             #
@@ -417,8 +418,6 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
     # ------------------------------------------------------------------ #
 
     def _on_left(self, _evt=None):
-        if self._text_input_focused():
-            return None
         if self._dismiss_help_on_command():
             return "break"
         if self._gallery_move(0, -1):
@@ -430,8 +429,6 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         return None
 
     def _on_right(self, _evt=None):
-        if self._text_input_focused():
-            return None
         if self._dismiss_help_on_command():
             return "break"
         if self._gallery_move(0, 1):
@@ -523,15 +520,11 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         return None
 
     def _on_home(self, _evt=None):
-        if self._text_input_focused():
-            return None
         if self._mode == "browser":
             self._move_selection(-len(self._browser_items))
         return None
 
     def _on_end(self, _evt=None):
-        if self._text_input_focused():
-            return None
         if self._mode == "browser":
             self._move_selection(len(self._browser_items))
         return None

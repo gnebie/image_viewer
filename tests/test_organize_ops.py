@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from image_viewer.organize_ops import (
+from image_viewer.domain.organize_ops import (
     OrganizeError,
     execute_move_or_copy,
     execute_move_or_copy_to_final,

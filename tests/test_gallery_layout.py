@@ -1,6 +1,6 @@
 import unittest
 
-from image_viewer.gallery_layout import (
+from image_viewer.ui.widgets.gallery_layout import (
     clamp_col_for_row,
     compute_columns,
     index_from_rc,

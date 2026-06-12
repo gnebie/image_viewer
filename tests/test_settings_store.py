@@ -3,8 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from image_viewer import settings_store
-from image_viewer.settings_store import (
+from image_viewer.services.settings_store import (
     AUTOPLAY_MS_MAX,
     AUTOPLAY_MS_MIN,
     DEFAULT_AUTOPLAY_MS,
@@ -41,7 +40,8 @@ class SettingsStoreTests(unittest.TestCase):
                 '{"thumbnail_size_level": 99}', encoding="utf-8"
             )
             s = load(cwd)
-            self.assertEqual(s.thumbnail_size_level, settings_store.THUMBNAIL_LEVEL_MAX)
+            from image_viewer.services.settings_store import THUMBNAIL_LEVEL_MAX
+            self.assertEqual(s.thumbnail_size_level, THUMBNAIL_LEVEL_MAX)
 
     def test_folder_shortcuts_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

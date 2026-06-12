@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from image_viewer.sorting_rules import resolve_destination
+from image_viewer.domain.sorting_rules import resolve_destination
 
 
 class SortingRulesTests(unittest.TestCase):

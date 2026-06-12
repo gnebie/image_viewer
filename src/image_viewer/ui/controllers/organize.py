@@ -12,17 +12,17 @@ from typing import Optional
 import tkinter as tk
 from tkinter import messagebox
 
-from .name_conflict_dialog import prompt_name_conflict
-from .operation_log import OperationRecord
-from .organize_ops import (
+from ..widgets.name_conflict_dialog import prompt_name_conflict
+from ...domain.operation_log import OperationRecord
+from ...domain.organize_ops import (
     OrganizeError,
     execute_move_or_copy_to_final,
     remove_path_for_overwrite,
     source_allows_move,
     unique_destination_path,
 )
-from .sorting_rules import resolve_destination
-from .sources import SUPPORTED_EXTS, ZIP_EXT
+from ...domain.sorting_rules import resolve_destination
+from ...domain.sources import SUPPORTED_EXTS, ZIP_EXT
 
 logger = logging.getLogger(__name__)
 

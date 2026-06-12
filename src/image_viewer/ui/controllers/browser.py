@@ -9,8 +9,8 @@ from typing import Optional
 import tkinter as tk
 from tkinter import ttk
 
-from .browser_filter import filter_items
-from .sources import FolderSource, ImageEntry, ImageSource, SourceError, SUPPORTED_EXTS, ZIP_EXT, ZipSource
+from ...services.browser_filter import filter_items
+from ...domain.sources import FolderSource, ImageEntry, ImageSource, SourceError, SUPPORTED_EXTS, ZIP_EXT, ZipSource
 
 logger = logging.getLogger(__name__)
 

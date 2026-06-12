@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from image_viewer.browser_filter import filter_items
+from image_viewer.services.browser_filter import filter_items
 
 
 class BrowserFilterTests(unittest.TestCase):

@@ -11,8 +11,8 @@ from tkinter import simpledialog, ttk
 
 from PIL import Image, ImageTk
 
-from .help_text import HELP_TEXT
-from .settings_store import DEFAULT_HOTKEYS
+from ..widgets.help_text import HELP_TEXT
+from ...services.settings_store import DEFAULT_HOTKEYS
 
 _HOTKEY_LABELS: dict[str, str] = {
     "enter_organize_mode": "Activer le mode tri",
@@ -21,8 +21,8 @@ _HOTKEY_LABELS: dict[str, str] = {
     "organize_op_move": "Opération : déplacer",
     "organize_op_copy": "Opération : copier",
 }
-from .slideshow import NavigationCommand, SlideshowState, apply_navigation, clamp_index
-from .sources import ImageEntry, ImageSource, SourceError, ZipSource
+from ...domain.slideshow import NavigationCommand, SlideshowState, apply_navigation, clamp_index
+from ...domain.sources import ImageEntry, ImageSource, SourceError, ZipSource
 
 logger = logging.getLogger(__name__)
 

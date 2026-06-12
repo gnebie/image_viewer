@@ -2,8 +2,8 @@ from pathlib import Path
 import unittest
 
 try:
-    from image_viewer.slideshow import SlideshowState, apply_navigation
-    from image_viewer.sources import ImageEntry, ImageSource
+    from image_viewer.domain.slideshow import SlideshowState, apply_navigation
+    from image_viewer.domain.sources import ImageEntry, ImageSource
 except ModuleNotFoundError as exc:  # pragma: no cover - env dependent
     if exc.name == "PIL":
         raise unittest.SkipTest("Pillow not installed in this environment") from exc

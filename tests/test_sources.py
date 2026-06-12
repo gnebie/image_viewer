@@ -11,7 +11,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from image_viewer.sources import (
+from image_viewer.domain.sources import (
     FolderSource,
     ImageEntry,
     SourceError,

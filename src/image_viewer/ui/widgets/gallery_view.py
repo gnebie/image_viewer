@@ -12,8 +12,8 @@ from tkinter import ttk
 from PIL import Image, ImageTk
 
 from .gallery_layout import compute_columns, rc_from_index, visible_rows
-from .settings_store import level_to_thumb_max_px
-from .sources import ImageEntry, ImageSource, SourceError
+from ...services.settings_store import level_to_thumb_max_px
+from ...domain.sources import ImageEntry, ImageSource, SourceError
 
 logger = logging.getLogger(__name__)
 

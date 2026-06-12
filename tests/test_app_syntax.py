@@ -5,10 +5,11 @@ from pathlib import Path
 SRC = Path(__file__).resolve().parents[1] / "src" / "image_viewer"
 PY_FILES = [
     "app.py",
-    "browser_mixin.py",
-    "organize_mixin.py",
-    "slideshow_mixin.py",
-    "help_text.py",
+    "ui/app.py",
+    "ui/controllers/browser.py",
+    "ui/controllers/organize.py",
+    "ui/controllers/slideshow.py",
+    "ui/widgets/help_text.py",
 ]
 
 
@@ -19,20 +20,23 @@ class AppSyntaxTests(unittest.TestCase):
         source = path.read_text(encoding="utf-8")
         ast.parse(source, filename=str(path))
 
-    def test_app_py_parses(self) -> None:
+    def test_app_shim_parses(self) -> None:
         self._assert_parses("app.py")
 
-    def test_browser_mixin_parses(self) -> None:
-        self._assert_parses("browser_mixin.py")
+    def test_ui_app_parses(self) -> None:
+        self._assert_parses("ui/app.py")
 
-    def test_organize_mixin_parses(self) -> None:
-        self._assert_parses("organize_mixin.py")
+    def test_browser_parses(self) -> None:
+        self._assert_parses("ui/controllers/browser.py")
 
-    def test_slideshow_mixin_parses(self) -> None:
-        self._assert_parses("slideshow_mixin.py")
+    def test_organize_parses(self) -> None:
+        self._assert_parses("ui/controllers/organize.py")
+
+    def test_slideshow_parses(self) -> None:
+        self._assert_parses("ui/controllers/slideshow.py")
 
     def test_help_text_parses(self) -> None:
-        self._assert_parses("help_text.py")
+        self._assert_parses("ui/widgets/help_text.py")
 
 
 if __name__ == "__main__":

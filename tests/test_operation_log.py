@@ -1,6 +1,6 @@
 import unittest
 
-from image_viewer.operation_log import OperationLog, OperationRecord
+from image_viewer.domain.operation_log import OperationLog, OperationRecord
 
 
 class OperationLogTests(unittest.TestCase):

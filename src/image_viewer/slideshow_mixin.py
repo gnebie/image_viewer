@@ -22,7 +22,7 @@ _HOTKEY_LABELS: dict[str, str] = {
     "organize_op_copy": "Opération : copier",
 }
 from .slideshow import NavigationCommand, SlideshowState, apply_navigation, clamp_index
-from .sources import ImageEntry, ImageSource, SourceError
+from .sources import ImageEntry, ImageSource, SourceError, ZipSource
 
 logger = logging.getLogger(__name__)
 
@@ -278,13 +278,29 @@ class SlideshowMixin:
 
     def _end_slideshow_to_browser(self) -> None:
         container = None
+        focus_path: Optional[Path] = None
         if self._slideshow is not None:  # type: ignore[attr-defined]
-            container = self._slideshow.source.container_dir()  # type: ignore[attr-defined]
+            src = self._slideshow.source  # type: ignore[attr-defined]
+            container = src.container_dir()
+            # Re-select what we were viewing: the zip file itself, or the
+            # current image for a folder slideshow.
+            if isinstance(src, ZipSource):
+                focus_path = src.zip_path
+            else:
+                entry = self._slideshow.current_entry()  # type: ignore[attr-defined]
+                if entry is not None and entry.kind == "file":
+                    focus_path = entry.path
         self._close_slideshow()
         if container and container.exists() and container.is_dir():
             self._browser_dir = container  # type: ignore[attr-defined]
         self._autoplay = False  # type: ignore[attr-defined]
         self._refresh_browser()  # type: ignore[attr-defined]
+        if focus_path is not None:
+            for i, p in enumerate(self._browser_items):  # type: ignore[attr-defined]
+                if p == focus_path:
+                    self._browser_selection = i  # type: ignore[attr-defined]
+                    self._apply_listbox_selection()  # type: ignore[attr-defined]
+                    break
         self.after_idle(self._listbox.focus_set)  # type: ignore[attr-defined]
 
     # ------------------------------------------------------------------ #

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import logging
 import json
 import sys
@@ -970,7 +972,6 @@ class App(tk.Tk):
 
         self._render_image_fit(img)
         self._current_image_info = self._build_current_image_info(entry, img)
-        self._apply_initial_geometry(img)
         if self._help_visible():
             self._help_label.config(text=self._help_text_with_context())
 
@@ -1015,18 +1016,6 @@ class App(tk.Tk):
         screen_h = max(1, self.winfo_screenheight())
         target_w = min(max(960, int(screen_w * 0.78)), int(screen_w * 0.92))
         target_h = min(max(700, int(screen_h * 0.78)), int(screen_h * 0.92))
-        pos_x = max(0, (screen_w - target_w) // 2)
-        pos_y = max(0, (screen_h - target_h) // 3)
-        self.geometry(f"{target_w}x{target_h}+{pos_x}+{pos_y}")
-        self._initial_geometry_applied = True
-
-    def _apply_initial_geometry(self, img: Image.Image) -> None:
-        if self._initial_geometry_applied:
-            return
-        screen_w = max(1, self.winfo_screenwidth())
-        screen_h = max(1, self.winfo_screenheight())
-        target_w = min(max(img.width + 80, 900), int(screen_w * 0.9))
-        target_h = min(max(img.height + 140, 650), int(screen_h * 0.9))
         pos_x = max(0, (screen_w - target_w) // 2)
         pos_y = max(0, (screen_h - target_h) // 3)
         self.geometry(f"{target_w}x{target_h}+{pos_x}+{pos_y}")
@@ -1443,8 +1432,11 @@ class App(tk.Tk):
         out_json.parent.mkdir(parents=True, exist_ok=True)
         payload = [{"entry": k, "label": v} for k, v in sorted(self._review_labels.items())]
         out_json.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        csv_lines = ["entry,label"] + [f"\"{k}\",\"{v}\"" for k, v in sorted(self._review_labels.items())]
-        out_csv.write_text("\n".join(csv_lines) + "\n", encoding="utf-8")
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["entry", "label"])
+        writer.writerows(sorted(self._review_labels.items()))
+        out_csv.write_text(buf.getvalue(), encoding="utf-8")
         self._toast.show(f"Export review: {out_json.name} / {out_csv.name}")
         return "break"
 

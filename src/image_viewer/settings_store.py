@@ -14,6 +14,9 @@ THUMBNAIL_LEVEL_MIN = 1
 THUMBNAIL_LEVEL_MAX = 9
 DEFAULT_THUMBNAIL_LEVEL = 5
 SHORTCUT_KEYS = frozenset(str(i) for i in range(10))
+# Note: "enter_organize_mode" and "organize_target_zip" intentionally share the
+# same default key "d". They are context-sensitive: "d" enters organize mode from
+# the browser, then acts as a toggle to zip/folder target once already inside.
 DEFAULT_HOTKEYS: dict[str, str] = {
     "enter_organize_mode": "d",
     "organize_target_image": "i",

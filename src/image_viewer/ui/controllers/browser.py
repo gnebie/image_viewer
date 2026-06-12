@@ -53,7 +53,6 @@ class BrowserMixin:
         if path.is_dir():
             self._browser_dir = path  # type: ignore[attr-defined]
             self._browser_selection = 0  # type: ignore[attr-defined]
-            self._organize_pending_dest = None  # type: ignore[attr-defined]
             self._refresh_browser()
 
     def _refresh_browser(self) -> None:
@@ -118,10 +117,11 @@ class BrowserMixin:
                 self._apply_listbox_selection()
 
             if self._organize_active:  # type: ignore[attr-defined]
-                self._organize_panel.grid(row=5, column=0, sticky="ew", pady=(0, 6))  # type: ignore[attr-defined]
                 self._snap_organize_source()  # type: ignore[attr-defined]
-                self._update_organize_panel()  # type: ignore[attr-defined]
-                self._set_organize_browser_status()  # type: ignore[attr-defined]
+                self._update_dest_panel_source()  # type: ignore[attr-defined]
+                self._set_status(  # type: ignore[attr-defined]
+                    "Mode Tri : 1-9 raccourcis, → entrer dossier, ↵ envoyer ici, r règle auto, Esc quitter"
+                )
             else:
                 n = len(self._browser_items)  # type: ignore[attr-defined]
                 n_all = len(self._browser_items_all)  # type: ignore[attr-defined]
@@ -146,17 +146,10 @@ class BrowserMixin:
     def _on_listbox_select(self, _evt=None) -> None:
         sel = self._listbox.curselection()  # type: ignore[attr-defined]
         if sel:
-            idx = int(sel[0])
-            if (
-                self._organize_active  # type: ignore[attr-defined]
-                and self._organize_pending_dest is not None  # type: ignore[attr-defined]
-                and idx != self._browser_selection  # type: ignore[attr-defined]
-            ):
-                self._organize_pending_dest = None  # type: ignore[attr-defined]
-            self._browser_selection = idx  # type: ignore[attr-defined]
+            self._browser_selection = int(sel[0])  # type: ignore[attr-defined]
         if self._organize_active:  # type: ignore[attr-defined]
             self._snap_organize_source()  # type: ignore[attr-defined]
-            self._update_organize_panel()  # type: ignore[attr-defined]
+            self._update_dest_panel_source()  # type: ignore[attr-defined]
             self._render_organize_highlights()  # type: ignore[attr-defined]
 
     def _apply_listbox_selection(self) -> None:
@@ -181,13 +174,8 @@ class BrowserMixin:
         self._apply_listbox_selection()
         self._listbox.focus_set()  # type: ignore[attr-defined]
         if self._organize_active:  # type: ignore[attr-defined]
-            if (
-                self._organize_pending_dest is not None  # type: ignore[attr-defined]
-                and self._browser_selection != old  # type: ignore[attr-defined]
-            ):
-                self._organize_pending_dest = None  # type: ignore[attr-defined]
             self._snap_organize_source()  # type: ignore[attr-defined]
-            self._update_organize_panel()  # type: ignore[attr-defined]
+            self._update_dest_panel_source()  # type: ignore[attr-defined]
         self._render_organize_highlights()  # type: ignore[attr-defined]
 
     def _enter_selected(self) -> None:

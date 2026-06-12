@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 GALLERY_DECODE_MAX_EDGE = 512
 # At most this many indices around the viewport may load full decode+thumbnail work.
 GALLERY_INDEX_BATCH = 100
+_SPINNER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
 
 class OrderedImageCache:
@@ -79,8 +80,17 @@ class SlideshowGalleryView(ttk.Frame):
         self._pil_cache = OrderedImageCache(max_items=240)
         self._sel_rect: Optional[int] = None
         self._placeholder_photo: Optional[ImageTk.PhotoImage] = None
+        self._loading_photo: Optional[ImageTk.PhotoImage] = None
         self._thumb_load_lo = 0
         self._thumb_load_hi_excl = 0
+
+        self._load_queue: list[int] = []
+        self._load_job: Optional[str] = None
+        self._load_attempted: set[int] = set()
+        self._spinner_texts: dict[int, int] = {}
+        self._spinner_step: int = 0
+        self._spinner_job: Optional[str] = None
+        self._zoom_job: Optional[str] = None
 
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
@@ -166,13 +176,25 @@ class SlideshowGalleryView(ttk.Frame):
         self._row_h = self._slot_px + self._gap
         self._pil_cache.clear()
         self._placeholder_photo = None
+        self._loading_photo = None
         self._full_rebuild()
 
     def bump_thumb_level(self, delta: int) -> int:
         new_level = max(1, min(9, self._thumb_level + delta))
-        if new_level != self._thumb_level:
-            self.set_thumb_level(new_level)
-        return self._thumb_level
+        if new_level == self._thumb_level:
+            return self._thumb_level
+        old_max = self._thumb_max_px
+        new_max = level_to_thumb_max_px(new_level)
+        factor = new_max / max(1, old_max)
+        cx = max(1, self._canvas.winfo_width()) / 2
+        cy = max(1, self._canvas.winfo_height()) / 2
+        self._canvas.scale("all", cx, cy, factor, factor)
+        if self._zoom_job is not None:
+            self.after_cancel(self._zoom_job)
+        self._zoom_job = self.after(100, lambda: self.set_thumb_level(new_level))
+        self._thumb_level = new_level
+        self._thumb_max_px = new_max
+        return new_level
 
     def reset_thumb_level(self, default_level: int) -> int:
         self.set_thumb_level(default_level)
@@ -226,6 +248,17 @@ class SlideshowGalleryView(ttk.Frame):
         self._canvas.configure(scrollregion=(0, 0, width, height))
 
     def _full_rebuild(self) -> None:
+        if self._load_job is not None:
+            self.after_cancel(self._load_job)
+            self._load_job = None
+        if self._zoom_job is not None:
+            self.after_cancel(self._zoom_job)
+            self._zoom_job = None
+        self._load_queue.clear()
+        self._load_attempted.clear()
+        for txt_id in self._spinner_texts.values():
+            self._canvas.delete(txt_id)
+        self._spinner_texts.clear()
         self._canvas.delete("all")
         self._tile_refs.clear()
         self._sel_rect = None
@@ -247,6 +280,10 @@ class SlideshowGalleryView(ttk.Frame):
     def _sync_tiles(self, force: bool = False) -> None:
         if not self._images or self._source is None:
             return
+        if self._load_job is not None:
+            self.after_cancel(self._load_job)
+            self._load_job = None
+        self._load_queue.clear()
         self._canvas.update_idletasks()
         cy = self._canvas.canvasy(0)
         ch = max(1, self._canvas.winfo_height())
@@ -280,6 +317,8 @@ class SlideshowGalleryView(ttk.Frame):
             if idx not in needed or force or not in_batch:
                 img_id, _ph = self._tile_refs.pop(idx)
                 self._canvas.delete(img_id)
+                if idx in self._spinner_texts:
+                    self._canvas.delete(self._spinner_texts.pop(idx))
 
         for idx in range(first_idx, last_idx):
             if idx in self._tile_refs and not force:
@@ -287,28 +326,46 @@ class SlideshowGalleryView(ttk.Frame):
             self._paint_tile(idx)
 
         self._update_selection_rect()
+        self._ensure_load_running()
+        self._ensure_spinner_running()
 
     def _paint_tile(self, idx: int) -> None:
         if self._source is None or idx < 0 or idx >= len(self._images):
             return
-        entry = self._images[idx]
         x0, y0 = self._cell_xy(idx)
         cx = x0 + self._slot_px // 2
         cy = y0 + self._slot_px // 2
 
         if not (self._thumb_load_lo <= idx < self._thumb_load_hi_excl):
             ph = self._placeholder_photo_image()
-        else:
-            thumb = self._load_thumb(entry, idx)
-            if thumb is None:
-                ph = ImageTk.PhotoImage(
-                    Image.new("RGB", (self._thumb_max_px, self._thumb_max_px), (48, 48, 52))
-                )
-            else:
-                ph = ImageTk.PhotoImage(thumb)
+            img_id = self._canvas.create_image(cx, cy, image=ph, anchor="center")
+            self._tile_refs[idx] = (img_id, ph)
+            return
 
+        key = (idx, self._thumb_max_px)
+        cached = self._pil_cache.get_copy(key)
+        if cached is not None:
+            ph = ImageTk.PhotoImage(cached)
+            img_id = self._canvas.create_image(cx, cy, image=ph, anchor="center")
+            self._tile_refs[idx] = (img_id, ph)
+            return
+
+        if idx in self._load_attempted:
+            ph = ImageTk.PhotoImage(
+                Image.new("RGB", (self._thumb_max_px, self._thumb_max_px), (48, 48, 52))
+            )
+            img_id = self._canvas.create_image(cx, cy, image=ph, anchor="center")
+            self._tile_refs[idx] = (img_id, ph)
+            return
+
+        ph = self._loading_placeholder_image()
         img_id = self._canvas.create_image(cx, cy, image=ph, anchor="center")
         self._tile_refs[idx] = (img_id, ph)
+        char = _SPINNER[self._spinner_step % len(_SPINNER)]
+        txt_id = self._canvas.create_text(cx, cy, text=char, fill="#999999", font=("Mono", 14))
+        self._spinner_texts[idx] = txt_id
+        if idx not in self._load_queue:
+            self._load_queue.append(idx)
 
     def _placeholder_photo_image(self) -> ImageTk.PhotoImage:
         if self._placeholder_photo is None:
@@ -316,6 +373,13 @@ class SlideshowGalleryView(ttk.Frame):
                 Image.new("RGB", (self._thumb_max_px, self._thumb_max_px), (30, 30, 35))
             )
         return self._placeholder_photo
+
+    def _loading_placeholder_image(self) -> ImageTk.PhotoImage:
+        if self._loading_photo is None:
+            self._loading_photo = ImageTk.PhotoImage(
+                Image.new("RGB", (self._thumb_max_px, self._thumb_max_px), (42, 42, 48))
+            )
+        return self._loading_photo
 
     def _load_thumb(self, entry: ImageEntry, idx: int) -> Optional[Image.Image]:
         key = (idx, self._thumb_max_px)
@@ -341,6 +405,63 @@ class SlideshowGalleryView(ttk.Frame):
             return None
         self._pil_cache.put(key, img.copy())
         return img
+
+    def _ensure_load_running(self) -> None:
+        if self._load_queue and self._load_job is None:
+            self._load_job = self.after(0, self._drain_load_queue)
+
+    def _ensure_spinner_running(self) -> None:
+        if self._spinner_texts and self._spinner_job is None:
+            self._spinner_job = self.after(80, self._tick_spinner)
+
+    def _stop_spinner_if_idle(self) -> None:
+        if not self._spinner_texts and self._spinner_job is not None:
+            self.after_cancel(self._spinner_job)
+            self._spinner_job = None
+
+    def _drain_load_queue(self) -> None:
+        self._load_job = None
+        idx = None
+        while self._load_queue:
+            candidate = self._load_queue.pop(0)
+            if candidate in self._tile_refs:
+                idx = candidate
+                break
+        if idx is None:
+            self._stop_spinner_if_idle()
+            return
+        if 0 <= idx < len(self._images) and self._source is not None:
+            self._load_thumb(self._images[idx], idx)
+        self._load_attempted.add(idx)
+        self._repaint_loaded_tile(idx)
+        if self._load_queue:
+            self._load_job = self.after(0, self._drain_load_queue)
+        else:
+            self._stop_spinner_if_idle()
+
+    def _repaint_loaded_tile(self, idx: int) -> None:
+        if idx in self._tile_refs:
+            img_id, _ph = self._tile_refs.pop(idx)
+            self._canvas.delete(img_id)
+        if idx in self._spinner_texts:
+            self._canvas.delete(self._spinner_texts.pop(idx))
+        if idx < len(self._images):
+            self._paint_tile(idx)
+        self._update_selection_rect()
+
+    def _tick_spinner(self) -> None:
+        self._spinner_job = None
+        if not self._spinner_texts:
+            return
+        self._spinner_step = (self._spinner_step + 1) % len(_SPINNER)
+        char = _SPINNER[self._spinner_step]
+        for idx, txt_id in list(self._spinner_texts.items()):
+            try:
+                self._canvas.itemconfigure(txt_id, text=char)
+            except tk.TclError:
+                self._spinner_texts.pop(idx, None)
+        if self._spinner_texts:
+            self._spinner_job = self.after(80, self._tick_spinner)
 
     def _selection_rect_coords(self) -> Optional[tuple[int, int, int, int]]:
         if not self._images:

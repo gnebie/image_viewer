@@ -14,6 +14,7 @@ from .controllers.browser import BrowserMixin
 from .widgets.gallery_layout import move_gallery_index
 from .widgets.help_text import HELP_TEXT
 from .widgets.gallery_view import SlideshowGalleryView
+from .widgets.organize_panel import OrganizeDestPanel
 from ..logging_config import setup_logging
 from .widgets.onboarding_dialog import show_onboarding
 from ..domain.operation_log import OperationLog
@@ -35,16 +36,73 @@ from .widgets.tooltip import ToolTip
 logger = logging.getLogger("image_viewer.app")
 
 SlideshowView = Literal["image", "gallery"]
-OrganizeTarget = Literal["zip_dir", "image"]
 OrganizeOp = Literal["move", "copy"]
 
 
 class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
+    def _setup_theme(self) -> None:
+        style = ttk.Style(self)
+        if "clam" in style.theme_names():
+            style.theme_use("clam")
+
+        BG = "#2b2b2b"
+        BG2 = "#333333"
+        FIELD = "#1e1e1e"
+        FG = "#dedede"
+        FG_DIM = "#909090"
+        ACCENT = "#5090d0"
+        BTN = "#404040"
+        BTN_ACT = "#545454"
+        BORDER = "#505050"
+
+        self.configure(bg=BG)
+        style.configure(".", background=BG, foreground=FG, font=("Sans Serif", 10))
+        style.configure("TFrame", background=BG)
+        style.configure("TLabel", background=BG, foreground=FG)
+        style.configure("TButton", background=BTN, foreground=FG,
+                        borderwidth=1, relief="flat", padding=(8, 3))
+        style.map("TButton",
+                  background=[("active", BTN_ACT), ("pressed", ACCENT)],
+                  relief=[("pressed", "flat")])
+        style.configure("TEntry", fieldbackground=FIELD, foreground=FG,
+                        insertcolor=FG, borderwidth=1, relief="flat")
+        style.configure("TCombobox", fieldbackground=FIELD, foreground=FG,
+                        selectbackground=ACCENT, selectforeground=FG, borderwidth=1)
+        style.map("TCombobox",
+                  fieldbackground=[("readonly", FIELD)],
+                  foreground=[("readonly", FG)])
+        style.configure("TScrollbar", background=BTN, troughcolor=BG2,
+                        borderwidth=0, arrowcolor=FG_DIM, relief="flat")
+        style.map("TScrollbar", background=[("active", BTN_ACT)])
+        style.configure("TLabelframe", background=BG, bordercolor=BORDER, relief="groove")
+        style.configure("TLabelframe.Label", background=BG, foreground=FG_DIM)
+
+        style.configure("Accent.TButton", background=ACCENT, foreground="white",
+                        borderwidth=1, relief="flat", padding=(8, 3))
+        style.map("Accent.TButton",
+                  background=[("active", "#6aA8e8"), ("pressed", "#3070b0")],
+                  relief=[("pressed", "flat")])
+        style.configure("Shortcut.TButton", background=BTN, foreground="#e0e0e0",
+                        borderwidth=1, relief="flat", padding=(6, 7))
+        style.map("Shortcut.TButton", background=[("active", BTN_ACT)])
+        style.configure("Free.TButton", background=BG2, foreground="#505050",
+                        borderwidth=1, relief="flat", padding=(6, 7))
+        style.map("Free.TButton", background=[("active", BTN)])
+
+        self._listbox_palette = dict(
+            background=FIELD, foreground=FG,
+            selectbackground=ACCENT, selectforeground="white",
+            inactiveselectbackground=ACCENT,
+            relief="flat", borderwidth=0,
+            highlightthickness=1, highlightbackground=BORDER,
+        )
+
     def __init__(self, start_path: Path):
         super().__init__()
         self._base_window_title = "Diaporama images (dossier + zip)"
         self.title(self._base_window_title)
         self.minsize(720, 480)
+        self._setup_theme()
 
         # Settings must be loaded before other state that depends on them.
         self._cwd = Path.cwd()
@@ -75,10 +133,8 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         self._gallery_saved_index: int = 0
 
         self._organize_active = False
-        self._organize_target: OrganizeTarget = "zip_dir"
         self._organize_op: OrganizeOp = "move"
         self._organize_source: Optional[Path] = None
-        self._organize_pending_dest: Optional[Path] = None
         self._operation_log = OperationLog(max_items=20)
         self._review_labels: dict[str, str] = {}
 
@@ -140,31 +196,21 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         self._sort_combo.grid(row=0, column=1, padx=(6, 0))
         self._sort_combo.bind("<<ComboboxSelected>>", self._on_sort_changed)
 
-        self._organize_panel = ttk.LabelFrame(self._browser_frame, text="Mode tri")
-        self._organize_help = ttk.Label(
-            self._organize_panel, justify="left", anchor="nw", text=""
+        self._organize_dest_panel = OrganizeDestPanel(
+            self._content,
+            on_send=self._organize_send_to_shortcut,
+            on_toggle_op=lambda op: setattr(self, "_organize_op", op),
         )
-        self._organize_help.grid(row=0, column=0, sticky="ew", padx=6, pady=4)
-        self._organize_state_label = ttk.Label(self._organize_panel, text="", anchor="w")
-        self._organize_state_label.grid(row=1, column=0, sticky="ew", padx=6, pady=(0, 4))
-        self._shortcuts_label = ttk.Label(
-            self._organize_panel, text="", justify="left", anchor="nw"
-        )
-        self._shortcuts_label.grid(row=2, column=0, sticky="ew", padx=6, pady=(0, 4))
+        self._organize_dest_panel.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
+        self._organize_dest_panel.grid_remove()
+        self._content.columnconfigure(1, weight=0)
 
         self._listbox = tk.Listbox(self._browser_frame, activestyle="none", exportselection=0)
         self._listbox_sb = ttk.Scrollbar(
             self._browser_frame, orient="vertical", command=self._listbox.yview
         )
         self._listbox.configure(yscrollcommand=self._listbox_sb.set)
-        # On Linux, inactiveselectbackground defaults to "" which makes the
-        # selection invisible whenever the listbox loses focus.  Mirror the
-        # focused colour so the highlight is always visible.
-        try:
-            sel_bg = str(self._listbox.cget("selectbackground"))
-            self._listbox.configure(inactiveselectbackground=sel_bg)
-        except tk.TclError:
-            pass
+        self._listbox.configure(**self._listbox_palette)
         self._browser_frame.columnconfigure(1, weight=0)
         self._listbox.grid(row=4, column=0, sticky="nsew")
         self._listbox_sb.grid(row=4, column=1, sticky="ns")
@@ -196,6 +242,10 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
 
         self._status = ttk.Label(self._bottom, text="", anchor="w")
         self._status.grid(row=0, column=2, sticky="ew")
+
+        self._btn_help = ttk.Button(self._bottom, text="?", width=3, command=self._on_help)
+        self._btn_help.grid(row=0, column=3, padx=(6, 0))
+        ToolTip(self._btn_help, "Afficher l'aide  ?")
 
         self._set_initial_window_geometry()
 
@@ -284,9 +334,10 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
             mode = f"Mode: Diaporama  [autoplay {auto_state} — espace]"
             hint = "Left/Right images, Page_Up galerie, g/j/t review, e export, ? aide"
         elif self._organize_active:
-            src = self._organize_source.name if self._organize_source is not None else "-"
-            mode = f"Mode: Tri ({self._organize_target}/{self._organize_op}) source={src}"
-            hint = "d/i cible, m/c operation, r regle, u annule, Entree confirme, Ctrl+Shift+chiffre, ? aide"
+            op = "déplacer" if self._organize_op == "move" else "copier"
+            src = self._organize_source.name if self._organize_source is not None else "—"
+            mode = f"Mode: Tri  [{op}]  source: {src}"
+            hint = "1-9 raccourcis, → entrer dossier, ↵ envoyer ici, m/c op, r règle, Ctrl+Maj+N enregistrer"
         else:
             mode = "Mode: Navigation"
             hint = "Up/Down selection, Right/Enter ouvrir, Left parent, filtre, d mode tri, l journal, ? aide"

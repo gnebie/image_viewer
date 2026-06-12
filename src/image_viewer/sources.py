@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import zipfile
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from PIL import Image, UnidentifiedImageError
 
@@ -31,18 +32,21 @@ class SourceError(Exception):
     pass
 
 
-class ImageSource:
+class ImageSource(ABC):
     """Abstraction of a collection of images with open/close lifecycle."""
 
-    def list_images(self) -> List[ImageEntry]:
+    @abstractmethod
+    def list_images(self) -> list[ImageEntry]:
         raise NotImplementedError
 
+    @abstractmethod
     def open_image(self, entry: ImageEntry) -> Image.Image:
         raise NotImplementedError
 
     def close(self) -> None:
         pass
 
+    @abstractmethod
     def container_dir(self) -> Path:
         raise NotImplementedError
 
@@ -65,7 +69,7 @@ class FolderSource(ImageSource):
     def container_dir(self) -> Path:
         return self.folder
 
-    def list_images(self) -> List[ImageEntry]:
+    def list_images(self) -> list[ImageEntry]:
         try:
             items = []
             for p in self.folder.iterdir():
@@ -109,10 +113,10 @@ class ZipSource(ImageSource):
                 raise SourceError(f"Impossible d'ouvrir le zip: {self.zip_path} ({e})") from e
         return self._zf
 
-    def list_images(self) -> List[ImageEntry]:
+    def list_images(self) -> list[ImageEntry]:
         zf = self._ensure_open()
         try:
-            entries: List[ImageEntry] = []
+            entries: list[ImageEntry] = []
             for info in zf.infolist():
                 name = info.filename
                 if name.endswith("/"):

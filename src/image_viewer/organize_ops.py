@@ -37,11 +37,12 @@ def unique_destination_path(dest_dir: Path, base_name: str) -> Path:
     stem = Path(base_name).stem
     suffix = Path(base_name).suffix
     n = 1
-    while True:
+    while n <= 9999:
         candidate = dest_dir / f"{stem}_{n}{suffix}"
         if not candidate.exists():
             return candidate
         n += 1
+    raise OrganizeError(f"Trop de fichiers en conflit pour {base_name} dans {dest_dir}")
 
 
 def remove_path_for_overwrite(path: Path) -> None:

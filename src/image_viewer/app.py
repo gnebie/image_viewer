@@ -365,7 +365,7 @@ class App(tk.Tk):
         if lower == "r":
             self._organize_apply_rule()
             return "break"
-        if action == "organize_target_image" or lower == "i":
+        if action == "organize_target_image":
             self._organize_target = "image"
             self._organize_pending_dest = None
             self._snap_organize_source()
@@ -373,7 +373,7 @@ class App(tk.Tk):
             self._set_organize_browser_status()
             self._update_mode_banner()
             return "break"
-        if action == "organize_target_zip" or lower == "d":
+        if action == "organize_target_zip":
             self._organize_target = "zip_dir"
             self._organize_pending_dest = None
             self._snap_organize_source()
@@ -381,13 +381,13 @@ class App(tk.Tk):
             self._set_organize_browser_status()
             self._update_mode_banner()
             return "break"
-        if action == "organize_op_copy" or lower == "c":
+        if action == "organize_op_copy":
             self._organize_op = "copy"
             self._update_organize_panel()
             self._set_organize_browser_status()
             self._update_mode_banner()
             return "break"
-        if action == "organize_op_move" or lower == "m":
+        if action == "organize_op_move":
             self._organize_op = "move"
             self._update_organize_panel()
             self._set_organize_browser_status()
@@ -929,6 +929,36 @@ class App(tk.Tk):
         self._canvas.delete("all")
         self._update_mode_banner()
 
+    def _find_first_readable_entry(
+        self, start_index: int
+    ) -> tuple[int, ImageEntry, Image.Image, Optional[str]] | None:
+        """Starting from start_index, scan forward for the first image that opens.
+
+        Returns (final_index, entry, image, skip_error) or None if all fail.
+        skip_error is non-None when we skipped at least one corrupt image.
+        """
+        if self._slideshow is None:
+            return None
+        images = self._slideshow.images
+        total = len(images)
+        last_error: Optional[str] = None
+        idx = start_index
+        while idx < total:
+            entry = images[idx]
+            try:
+                img = self._slideshow.source.open_image(entry)
+                skip_error = last_error if idx != start_index else None
+                return (idx, entry, img, skip_error)
+            except SourceError as e:
+                last_error = str(e)
+            except (OSError, ValueError, RuntimeError) as e:
+                last_error = f"Erreur lecture image: {e}"
+            except Exception as e:
+                logger.exception("open_image inattendu")
+                last_error = f"Erreur lecture image: {e}"
+            idx += 1
+        return None
+
     def _show_current_image(self) -> None:
         if self._slideshow is None:
             return
@@ -938,37 +968,18 @@ class App(tk.Tk):
             self._end_slideshow_to_browser()
             return
 
-        entry = self._slideshow.current_entry()
-        if entry is None:
+        if self._slideshow.current_entry() is None:
             self._end_slideshow_to_browser()
             return
 
-        img = None
-        last_error = None
-        start_idx = self._slideshow.index
-
-        while True:
-            try:
-                img = self._slideshow.source.open_image(entry)
-                break
-            except SourceError as e:
-                last_error = str(e)
-            except (OSError, ValueError, RuntimeError) as e:
-                last_error = f"Erreur lecture image: {e}"
-            except Exception as e:
-                logger.exception("open_image inattendu")
-                last_error = f"Erreur lecture image: {e}"
-
-            if self._slideshow.index >= total - 1:
-                break
-            self._slideshow.index += 1
-            entry = self._slideshow.images[self._slideshow.index]
-
-        if img is None:
-            if last_error:
-                self._set_status(last_error)
+        result = self._find_first_readable_entry(self._slideshow.index)
+        if result is None:
+            self._set_status("Aucune image lisible a partir de cette position.")
             self._end_slideshow_to_browser()
             return
+
+        final_idx, entry, img, skip_error = result
+        self._slideshow.index = final_idx
 
         self._render_image_fit(img)
         self._current_image_info = self._build_current_image_info(entry, img)
@@ -977,7 +988,7 @@ class App(tk.Tk):
 
         name = entry.display_name()
         pos = self._slideshow.index + 1
-        extra = f" - (skip: {last_error})" if last_error and start_idx != self._slideshow.index else ""
+        extra = f" - (skip: {skip_error})" if skip_error else ""
         key = f"{entry.path}|{entry.member or ''}"
         review = self._review_labels.get(key, "-")
         self._set_status(f"{pos}/{total} - {name}{extra} [review={review}]")

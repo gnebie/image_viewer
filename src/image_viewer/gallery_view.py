@@ -330,25 +330,17 @@ class SlideshowGalleryView(ttk.Frame):
         try:
             if img.mode not in ("RGB", "RGBA"):
                 img = img.convert("RGB")
-            work = img.copy()
-            mw, mh = work.size
-            if max(mw, mh) > GALLERY_DECODE_MAX_EDGE:
-                work.thumbnail(
+            if max(img.width, img.height) > GALLERY_DECODE_MAX_EDGE:
+                img.thumbnail(
                     (GALLERY_DECODE_MAX_EDGE, GALLERY_DECODE_MAX_EDGE),
                     Image.Resampling.LANCZOS,
                 )
-            thumb = work.copy()
-            thumb.thumbnail((self._thumb_max_px, self._thumb_max_px), Image.Resampling.LANCZOS)
+            img.thumbnail((self._thumb_max_px, self._thumb_max_px), Image.Resampling.LANCZOS)
         except (OSError, ValueError, MemoryError) as e:
             logger.debug("Gallery thumb resize failed: %s", e)
             return None
-        finally:
-            try:
-                img.close()
-            except OSError:
-                pass
-        self._pil_cache.put(key, thumb.copy())
-        return thumb
+        self._pil_cache.put(key, img.copy())
+        return img
 
     def _selection_rect_coords(self) -> Optional[tuple[int, int, int, int]]:
         if not self._images:

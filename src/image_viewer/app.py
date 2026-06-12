@@ -225,6 +225,16 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
 
         self._listbox.bind("<Double-Button-1>", lambda e: self._enter_selected())
         self._listbox.bind("<<ListboxSelect>>", self._on_listbox_select)
+        # The Listbox class bindings (tk::ListboxUpDown, xview scroll) would fire in
+        # addition to the toplevel bindings — selection would move twice per keypress
+        # and drift via the listbox's internal "active" element. Handle navigation on
+        # the widget itself and "break" so neither the class nor the toplevel sees it.
+        self._listbox.bind("<Up>", self._on_listbox_up)
+        self._listbox.bind("<Down>", self._on_listbox_down)
+        self._listbox.bind("<Home>", self._on_listbox_home)
+        self._listbox.bind("<End>", self._on_listbox_end)
+        self._listbox.bind("<Left>", self._on_listbox_left)
+        self._listbox.bind("<Right>", self._on_listbox_right)
 
         self.protocol("WM_DELETE_WINDOW", self._on_close_window)
 
@@ -453,6 +463,42 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         elif self._mode == "slideshow":
             self._queue_navigation("last")
         return None
+
+    def _on_listbox_up(self, _evt=None):
+        if self._dismiss_help_on_command():
+            return "break"
+        self._move_selection(-1)
+        return "break"
+
+    def _on_listbox_down(self, _evt=None):
+        if self._dismiss_help_on_command():
+            return "break"
+        self._move_selection(+1)
+        return "break"
+
+    def _on_listbox_home(self, _evt=None):
+        if self._dismiss_help_on_command():
+            return "break"
+        self._move_selection(-len(self._browser_items))
+        return "break"
+
+    def _on_listbox_end(self, _evt=None):
+        if self._dismiss_help_on_command():
+            return "break"
+        self._move_selection(len(self._browser_items))
+        return "break"
+
+    def _on_listbox_left(self, _evt=None):
+        if self._dismiss_help_on_command():
+            return "break"
+        self._go_parent()
+        return "break"
+
+    def _on_listbox_right(self, _evt=None):
+        if self._dismiss_help_on_command():
+            return "break"
+        self._enter_selected()
+        return "break"
 
     def _on_enter(self, _evt=None):
         if self._dismiss_help_on_command():

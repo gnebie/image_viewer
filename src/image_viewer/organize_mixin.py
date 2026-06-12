@@ -321,9 +321,7 @@ class OrganizeMixin:
                     break
         if idx is not None:
             self._browser_selection = idx  # type: ignore[attr-defined]
-            self._listbox.select_clear(0, tk.END)  # type: ignore[attr-defined]
-            self._listbox.select_set(idx)  # type: ignore[attr-defined]
-            self._listbox.see(idx)  # type: ignore[attr-defined]
+            self._apply_listbox_selection()  # type: ignore[attr-defined]
         self._snap_organize_source()
         self._update_organize_panel()
 

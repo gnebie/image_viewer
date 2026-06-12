@@ -115,8 +115,7 @@ class BrowserMixin:
                     0,
                     min(self._browser_selection, len(self._browser_items) - 1),  # type: ignore[attr-defined]
                 )
-                self._listbox.select_set(self._browser_selection)  # type: ignore[attr-defined]
-                self._listbox.see(self._browser_selection)  # type: ignore[attr-defined]
+                self._apply_listbox_selection()
 
             if self._organize_active:  # type: ignore[attr-defined]
                 self._organize_panel.grid(row=5, column=0, sticky="ew", pady=(0, 6))  # type: ignore[attr-defined]
@@ -160,16 +159,34 @@ class BrowserMixin:
             self._update_organize_panel()  # type: ignore[attr-defined]
             self._render_organize_highlights()  # type: ignore[attr-defined]
 
+    def _apply_listbox_selection(self) -> None:
+        """Sync listbox selection AND active element to _browser_selection.
+
+        The active element must follow, otherwise any remaining Listbox class
+        binding navigates relative to a stale position.
+        """
+        self._listbox.select_clear(0, tk.END)  # type: ignore[attr-defined]
+        self._listbox.select_set(self._browser_selection)  # type: ignore[attr-defined]
+        self._listbox.activate(self._browser_selection)  # type: ignore[attr-defined]
+        self._listbox.see(self._browser_selection)  # type: ignore[attr-defined]
+
     def _move_selection(self, delta: int) -> None:
         if not self._browser_items:  # type: ignore[attr-defined]
             return
+        old = self._browser_selection  # type: ignore[attr-defined]
         self._browser_selection = max(  # type: ignore[attr-defined]
             0,
             min(self._browser_selection + delta, len(self._browser_items) - 1),  # type: ignore[attr-defined]
         )
-        self._listbox.select_clear(0, tk.END)  # type: ignore[attr-defined]
-        self._listbox.select_set(self._browser_selection)  # type: ignore[attr-defined]
-        self._listbox.see(self._browser_selection)  # type: ignore[attr-defined]
+        self._apply_listbox_selection()
+        if self._organize_active:  # type: ignore[attr-defined]
+            if (
+                self._organize_pending_dest is not None  # type: ignore[attr-defined]
+                and self._browser_selection != old  # type: ignore[attr-defined]
+            ):
+                self._organize_pending_dest = None  # type: ignore[attr-defined]
+            self._snap_organize_source()  # type: ignore[attr-defined]
+            self._update_organize_panel()  # type: ignore[attr-defined]
         self._render_organize_highlights()  # type: ignore[attr-defined]
 
     def _enter_selected(self) -> None:
@@ -197,9 +214,7 @@ class BrowserMixin:
         try:
             idx = next(i for i, p in enumerate(self._browser_items) if p == prev)  # type: ignore[attr-defined]
             self._browser_selection = idx  # type: ignore[attr-defined]
-            self._listbox.select_clear(0, tk.END)  # type: ignore[attr-defined]
-            self._listbox.select_set(idx)  # type: ignore[attr-defined]
-            self._listbox.see(idx)  # type: ignore[attr-defined]
+            self._apply_listbox_selection()
         except StopIteration:
             pass
 

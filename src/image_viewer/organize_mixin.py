@@ -94,7 +94,7 @@ class OrganizeMixin:
         lower = evt.keysym.lower()
         action = self._resolve_hotkey_action(lower)
         if not self._organize_active:  # type: ignore[attr-defined]
-            if action == "enter_organize_mode" or lower == "d":
+            if action == "enter_organize_mode":
                 self._enter_organize_mode()
                 return "break"
             return None
@@ -157,6 +157,21 @@ class OrganizeMixin:
             return "break"
         return None
 
+    def _update_organize_help_panel(self) -> None:
+        hk = self._settings.hotkeys  # type: ignore[attr-defined]
+        d = hk.get("enter_organize_mode", "d")
+        i = hk.get("organize_target_image", "i")
+        m = hk.get("organize_op_move", "m")
+        c = hk.get("organize_op_copy", "c")
+        self._organize_help.config(  # type: ignore[attr-defined]
+            text=(
+                f"{d} = cible zip/dossier   {i} = cible images   {m} = deplacer   {c} = copier\n"
+                "r = regle auto   u = annuler destination   0-9 = raccourci dossier\n"
+                "Ctrl+Shift+chiffre = enregistrer raccourci ici\n"
+                "Entree sur dossier = armer puis confirmer   Right = entrer dossier   Esc = quitter"
+            )
+        )
+
     def _enter_organize_mode(self) -> None:
         if self._mode != "browser":  # type: ignore[attr-defined]
             return
@@ -167,6 +182,7 @@ class OrganizeMixin:
         self._snap_organize_source()
         self.title(f"[Tri] {self._base_window_title}")  # type: ignore[attr-defined]
         self._listbox.focus_set()  # type: ignore[attr-defined]
+        self._update_organize_help_panel()
         self._update_organize_panel()
         self._set_organize_browser_status()
         self._organize_panel.grid(row=5, column=0, sticky="ew", pady=(0, 6))  # type: ignore[attr-defined]
@@ -408,19 +424,42 @@ class OrganizeMixin:
         key = f"{entry.path}|{entry.member or ''}"
         self._review_labels[key] = label  # type: ignore[attr-defined]
         self._toast.show(f"Review: {entry.display_name()} -> {label}")  # type: ignore[attr-defined]
+        self._autosave_review_labels()
         self._show_current_image()  # type: ignore[attr-defined]
 
+    def _autosave_review_labels(self) -> None:
+        if not self._review_labels:  # type: ignore[attr-defined]
+            return
+        try:
+            out_json = self._cwd / "logs" / "review_labels.json"  # type: ignore[attr-defined]
+            out_json.parent.mkdir(parents=True, exist_ok=True)
+            payload = [{"entry": k, "label": v} for k, v in sorted(self._review_labels.items())]  # type: ignore[attr-defined]
+            out_json.write_text(
+                json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+            )
+        except OSError as e:
+            logger.warning("Autosave review labels: %s", e)
+
     def _on_review_keep(self, _evt=None):
+        if self._mode != "slideshow":  # type: ignore[attr-defined]
+            self._set_status("Review disponible uniquement en mode diaporama.")  # type: ignore[attr-defined]
+            return None
         self._set_review_label("garder")
-        return "break" if self._mode == "slideshow" else None  # type: ignore[attr-defined]
+        return "break"
 
     def _on_review_drop(self, _evt=None):
+        if self._mode != "slideshow":  # type: ignore[attr-defined]
+            self._set_status("Review disponible uniquement en mode diaporama.")  # type: ignore[attr-defined]
+            return None
         self._set_review_label("jeter")
-        return "break" if self._mode == "slideshow" else None  # type: ignore[attr-defined]
+        return "break"
 
     def _on_review_todo(self, _evt=None):
+        if self._mode != "slideshow":  # type: ignore[attr-defined]
+            self._set_status("Review disponible uniquement en mode diaporama.")  # type: ignore[attr-defined]
+            return None
         self._set_review_label("a_trier")
-        return "break" if self._mode == "slideshow" else None  # type: ignore[attr-defined]
+        return "break"
 
     def _on_review_export(self, _evt=None):
         if self._mode != "slideshow":  # type: ignore[attr-defined]

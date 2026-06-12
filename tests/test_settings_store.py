@@ -5,6 +5,9 @@ from pathlib import Path
 
 from image_viewer import settings_store
 from image_viewer.settings_store import (
+    AUTOPLAY_MS_MAX,
+    AUTOPLAY_MS_MIN,
+    DEFAULT_AUTOPLAY_MS,
     DEFAULT_HOTKEYS,
     DEFAULT_THUMBNAIL_LEVEL,
     Settings,
@@ -68,6 +71,32 @@ class SettingsStoreTests(unittest.TestCase):
             self.assertEqual(s2.hotkeys["enter_organize_mode"], "x")
             self.assertEqual(s2.hotkeys["organize_op_copy"], DEFAULT_HOTKEYS["organize_op_copy"])
             self.assertEqual(len(s2.sorting_rules), 1)
+
+
+    def test_autoplay_ms_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cwd = Path(tmp)
+            s = Settings(autoplay_ms=1500)
+            save(s, cwd)
+            s2 = load(cwd)
+            self.assertEqual(s2.autoplay_ms, 1500)
+
+    def test_autoplay_ms_clamped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cwd = Path(tmp)
+            (cwd / "config").mkdir(parents=True)
+            (cwd / "config" / "settings.json").write_text(
+                '{"autoplay_ms": 50}', encoding="utf-8"
+            )
+            s = load(cwd)
+            self.assertEqual(s.autoplay_ms, AUTOPLAY_MS_MIN)
+
+    def test_autoplay_ms_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            s = load(Path(tmp))
+            self.assertEqual(s.autoplay_ms, DEFAULT_AUTOPLAY_MS)
+            self.assertGreaterEqual(s.autoplay_ms, AUTOPLAY_MS_MIN)
+            self.assertLessEqual(s.autoplay_ms, AUTOPLAY_MS_MAX)
 
 
 if __name__ == "__main__":

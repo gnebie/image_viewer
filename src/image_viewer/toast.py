@@ -15,7 +15,7 @@ class ToastOverlay:
         self._label.grid(row=0, column=0, sticky="w")
         self._frame.place_forget()
 
-    def show(self, text: str, *, ms: int = 2200) -> None:
+    def show(self, text: str, *, ms: int = 3000) -> None:
         if self._job is not None:
             try:
                 self._parent.after_cancel(self._job)

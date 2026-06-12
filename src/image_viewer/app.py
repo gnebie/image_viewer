@@ -12,6 +12,7 @@ from tkinter import messagebox, ttk
 
 from .browser_mixin import BrowserMixin
 from .gallery_layout import move_gallery_index
+from .help_text import HELP_TEXT
 from .gallery_view import SlideshowGalleryView
 from .logging_config import setup_logging
 from .onboarding_dialog import show_onboarding
@@ -35,58 +36,6 @@ logger = logging.getLogger("image_viewer.app")
 SlideshowView = Literal["image", "gallery"]
 OrganizeTarget = Literal["zip_dir", "image"]
 OrganizeOp = Literal["move", "copy"]
-
-
-HELP_TEXT = """Commandes
-
-Navigation
-  Up / Down      selection
-  Right / Enter  ouvrir dossier, zip, image
-  Left           dossier parent
-  Backspace      dossier parent
-  Esc            quitter (navigation) ; quitter mode tri (mode tri)
-  d              mode tri (deplacement / copie)
-
-Diaporama
-  Left           image precedente (ou fermer au debut)
-  Right          image suivante (ou fermer a la fin)
-  Up             premiere image
-  Down           derniere image
-  Page_Up        galerie miniatures (depuis l'image)
-  Page_Down      (image) sans effet ; (galerie) ouvrir l'image selectionnee
-  Space          autoplay on/off
-  + / -          vitesse autoplay (image) ; taille vignettes (galerie)
-  *              taille vignettes par defaut (galerie)
-  ?              aide
-  Esc            retour navigation (image) ; annuler galerie (galerie)
-
-Galerie miniatures
-  Fleches        deplacer la selection
-  Page_Up        defiler la page vers le haut
-  Entree         ouvrir l'image selectionnee
-  Esc            fermer sans appliquer la selection
-
-Mode tri (navigation, focus listbox)
-  d              activer le mode ; cible zip/dossier (d) ou images (i)
-  i              cible images
-  m / c          deplacer / copier
-  r              appliquer une regle auto (dry-run puis confirmation)
-  u              annuler destination armee
-  0-9            aller au raccourci dossier (config)
-  Ctrl+Shift+chiffre  enregistrer le dossier courant pour ce chiffre (ligne ou pave)
-  Entree         sur dossier: armer puis confirmer (2 fois) puis dialogue
-  Right          entrer dossier ou ouvrir zip / image
-  Esc            quitter le mode tri
-
-Divers
-  f              plein ecran on/off
-  l              afficher/masquer le journal des operations (navigation)
-  Ctrl+K         configurer les hotkeys
-  g / j / t      etiqueter image courante (garder/jeter/a_trier) en diaporama
-  e              exporter les etiquettes review (json+csv)
-  r              en mode tri: appliquer une regle auto (dry-run + confirmation)
-  F5             recharger le dossier courant (navigation)
-"""
 
 
 class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
@@ -128,7 +77,6 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         self._organize_op: OrganizeOp = "move"
         self._organize_source: Optional[Path] = None
         self._organize_pending_dest: Optional[Path] = None
-        self._organize_pending_overwrite = False
         self._operation_log = OperationLog(max_items=20)
         self._review_labels: dict[str, str] = {}
 
@@ -176,23 +124,20 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
 
         self._organize_panel = ttk.LabelFrame(self._browser_frame, text="Mode tri")
         self._organize_help = ttk.Label(
-            self._organize_panel,
-            justify="left",
-            anchor="nw",
-            text=(
-                "d = cible zip/dossier   i = cible images   m = deplacer   c = copier\n"
-                "r = regle auto (dry-run)   u = annuler destination armee\n"
-                "0-9 = raccourci dossier   Ctrl+Shift+chiffre = enregistrer raccourci ici\n"
-                "Entree sur dossier = armer, Entree encore = confirmer   Right = entrer dossier\n"
-                "Esc = quitter le mode tri"
-            ),
+            self._organize_panel, justify="left", anchor="nw", text=""
         )
         self._organize_help.grid(row=0, column=0, sticky="ew", padx=6, pady=4)
         self._organize_state_label = ttk.Label(self._organize_panel, text="", anchor="w")
         self._organize_state_label.grid(row=1, column=0, sticky="ew", padx=6, pady=(0, 4))
 
         self._listbox = tk.Listbox(self._browser_frame, activestyle="none")
+        self._listbox_sb = ttk.Scrollbar(
+            self._browser_frame, orient="vertical", command=self._listbox.yview
+        )
+        self._listbox.configure(yscrollcommand=self._listbox_sb.set)
+        self._browser_frame.columnconfigure(1, weight=0)
         self._listbox.grid(row=4, column=0, sticky="nsew")
+        self._listbox_sb.grid(row=4, column=1, sticky="ns")
         self._listbox.bindtags(("OrganizeIV",) + self._listbox.bindtags())
         self.bind_class("OrganizeIV", "<KeyPress>", self._organize_listbox_key)
 
@@ -236,6 +181,8 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         self.bind("<Return>", self._on_enter)
         self.bind("<Escape>", self._on_escape)
         self.bind("<BackSpace>", self._on_backspace)
+        self.bind("<Home>", self._on_home)
+        self.bind("<End>", self._on_end)
         self.bind("<Configure>", self._on_resize)
 
         self.bind("<Prior>", self._on_page_up)
@@ -287,17 +234,18 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
     def _update_mode_banner(self) -> None:
         if self._is_gallery_active():
             mode = "Mode: Galerie"
-            hint = "Fleches selection, Page_Up scroll, Enter/Page_Down ouvrir, Esc annuler"
+            hint = "Fleches selection, Page_Up scroll, Enter/Page_Down ouvrir, Esc annuler, ? aide"
         elif self._mode == "slideshow":
-            mode = "Mode: Diaporama"
+            auto_state = "ON" if self._autoplay else "OFF"
+            mode = f"Mode: Diaporama  [autoplay {auto_state} — espace]"
             hint = "Left/Right images, Page_Up galerie, g/j/t review, e export, ? aide"
         elif self._organize_active:
             src = self._organize_source.name if self._organize_source is not None else "-"
             mode = f"Mode: Tri ({self._organize_target}/{self._organize_op}) source={src}"
-            hint = "d/i cible, m/c operation, r regle, u annule, Entree confirme, Ctrl+Shift+chiffre"
+            hint = "d/i cible, m/c operation, r regle, u annule, Entree confirme, Ctrl+Shift+chiffre, ? aide"
         else:
             mode = "Mode: Navigation"
-            hint = "Up/Down selection, Right/Enter ouvrir, Left parent, filtre via champ, d mode tri, l journal"
+            hint = "Up/Down selection, Right/Enter ouvrir, Left parent, filtre, d mode tri, l journal, ? aide"
         self._mode_banner.config(text=mode)
         self._mode_hint.config(text=hint)
 
@@ -490,6 +438,16 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
             self._go_parent()
         return None
 
+    def _on_home(self, _evt=None):
+        if self._mode == "browser":
+            self._move_selection(-len(self._browser_items))
+        return None
+
+    def _on_end(self, _evt=None):
+        if self._mode == "browser":
+            self._move_selection(len(self._browser_items))
+        return None
+
     def _on_escape(self, _evt=None):
         if self._dismiss_help_on_command():
             return "break"
@@ -558,6 +516,7 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         else:
             self._cancel_autoplay()
             self._set_status("Auto: OFF - espace pour demarrer")
+        self._update_mode_banner()
         return None
 
     def _on_plus(self, _evt=None):

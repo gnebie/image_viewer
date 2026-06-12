@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Deque, Literal, Optional
+from typing import Literal, Optional
 
 from .sources import ImageEntry, ImageSource
 
@@ -16,7 +16,7 @@ class SlideshowState:
     source: ImageSource
     images: list[ImageEntry]
     index: int = 0
-    pending_navigation: Deque[NavigationCommand] = field(default_factory=deque)
+    pending_navigation: deque[NavigationCommand] = field(default_factory=deque)
     max_pending_navigation: int = 3
 
     def current_entry(self) -> Optional[ImageEntry]:

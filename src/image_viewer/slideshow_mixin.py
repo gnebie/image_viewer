@@ -11,6 +11,7 @@ from tkinter import ttk
 
 from PIL import Image, ImageTk
 
+from .help_text import HELP_TEXT
 from .settings_store import DEFAULT_HOTKEYS
 from .slideshow import NavigationCommand, SlideshowState, apply_navigation, clamp_index
 from .sources import ImageEntry, ImageSource, SourceError
@@ -78,7 +79,7 @@ class SlideshowMixin:
         self._slideshow = SlideshowState(source=src, images=images, index=clamp_index(index, len(images)))  # type: ignore[attr-defined]
         self._mode = "slideshow"  # type: ignore[attr-defined]
         self._slideshow_view = "image"  # type: ignore[attr-defined]
-        self.title(f"{src.container_dir().name} — {self._base_window_title}")  # type: ignore[attr-defined]
+        self.title(f"{src.display_name()} — {self._base_window_title}")  # type: ignore[attr-defined]
         self._browser_frame.lower()  # type: ignore[attr-defined]
         self._gallery.unbind_interaction()  # type: ignore[attr-defined]
         self._gallery_outer.lower()  # type: ignore[attr-defined]
@@ -114,8 +115,9 @@ class SlideshowMixin:
     def _find_first_readable_entry(
         self, start_index: int
     ) -> tuple[int, ImageEntry, Image.Image, Optional[str]] | None:
-        """Scan forward from start_index for the first image that opens.
+        """Scan for the first readable image starting at start_index.
 
+        Scans forward first; if nothing found, scans backward from start_index-1.
         Returns (final_index, entry, image, skip_error) or None if all fail.
         skip_error is non-None when at least one corrupt image was skipped.
         """
@@ -124,8 +126,8 @@ class SlideshowMixin:
         images = self._slideshow.images  # type: ignore[attr-defined]
         total = len(images)
         last_error: Optional[str] = None
-        idx = start_index
-        while idx < total:
+
+        for idx in range(start_index, total):
             entry = images[idx]
             try:
                 img = self._slideshow.source.open_image(entry)  # type: ignore[attr-defined]
@@ -138,7 +140,15 @@ class SlideshowMixin:
             except Exception as e:
                 logger.exception("open_image inattendu")
                 last_error = f"Erreur lecture image: {e}"
-            idx += 1
+
+        for idx in range(start_index - 1, -1, -1):
+            entry = images[idx]
+            try:
+                img = self._slideshow.source.open_image(entry)  # type: ignore[attr-defined]
+                return (idx, entry, img, last_error)
+            except Exception:
+                pass
+
         return None
 
     def _show_current_image(self) -> None:
@@ -276,6 +286,10 @@ class SlideshowMixin:
         if self._slideshow is None:  # type: ignore[attr-defined]
             self._autoplay = False  # type: ignore[attr-defined]
             return
+        # Use the queue so keyboard-triggered navigation and autoplay never interleave.
+        if self._slideshow.pending_navigation:  # type: ignore[attr-defined]
+            self._schedule_autoplay()
+            return
         result = apply_navigation(self._slideshow, "next")  # type: ignore[attr-defined]
         if result == "close":
             self._autoplay = False  # type: ignore[attr-defined]
@@ -290,7 +304,6 @@ class SlideshowMixin:
     # ------------------------------------------------------------------ #
 
     def _help_text_with_context(self) -> str:
-        from .app import HELP_TEXT  # avoid circular at module level
         info = self._current_image_info or {}  # type: ignore[attr-defined]
         lines = [HELP_TEXT.rstrip()]
         if self._is_gallery_active():
@@ -348,16 +361,25 @@ class SlideshowMixin:
     # Hotkeys dialog                                                      #
     # ------------------------------------------------------------------ #
 
+    _HOTKEY_LABELS: dict[str, str] = {
+        "enter_organize_mode": "Activer le mode tri",
+        "organize_target_image": "Cible : images",
+        "organize_target_zip": "Cible : zip / dossiers",
+        "organize_op_move": "Opération : déplacer",
+        "organize_op_copy": "Opération : copier",
+    }
+
     def _on_open_hotkeys_dialog(self, _evt=None):
         win = tk.Toplevel(self)  # type: ignore[arg-type]
-        win.title("Raccourcis")
+        win.title("Raccourcis clavier")
         win.transient(self.winfo_toplevel())  # type: ignore[attr-defined]
         win.grab_set()
         outer = ttk.Frame(win, padding=12)
         outer.grid(row=0, column=0, sticky="nsew")
         rows: dict[str, ttk.Entry] = {}
         for r, (action, default_key) in enumerate(DEFAULT_HOTKEYS.items()):
-            ttk.Label(outer, text=action).grid(row=r, column=0, sticky="w", padx=(0, 8), pady=2)
+            label = self._HOTKEY_LABELS.get(action, action)
+            ttk.Label(outer, text=label).grid(row=r, column=0, sticky="w", padx=(0, 8), pady=2)
             ent = ttk.Entry(outer, width=8)
             ent.insert(0, self._settings.hotkeys.get(action, default_key))  # type: ignore[attr-defined]
             ent.grid(row=r, column=1, sticky="w", pady=2)

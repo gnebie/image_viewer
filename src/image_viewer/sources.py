@@ -50,6 +50,10 @@ class ImageSource(ABC):
     def container_dir(self) -> Path:
         raise NotImplementedError
 
+    def display_name(self) -> str:
+        """Short name shown in window title — override for non-folder sources."""
+        return self.container_dir().name
+
     def describe_entry(self, entry: ImageEntry) -> dict[str, str]:
         base = {
             "name": entry.path.name if entry.kind == "file" else Path(entry.member or "").name,
@@ -143,6 +147,9 @@ class ZipSource(ImageSource):
             raise SourceError(f"Fichier introuvable dans le zip: {entry.member}") from e
         except (UnidentifiedImageError, OSError, RuntimeError, zipfile.BadZipFile) as e:
             raise SourceError(f"Image zip illisible/corrompue: {entry.member} ({e})") from e
+
+    def display_name(self) -> str:
+        return self.zip_path.name
 
     def close(self) -> None:
         if self._zf is not None:

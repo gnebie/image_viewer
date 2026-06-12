@@ -92,10 +92,10 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         self._listbox_palette = dict(
             background=FIELD, foreground=FG,
             selectbackground=ACCENT, selectforeground="white",
-            inactiveselectbackground=ACCENT,
             relief="flat", borderwidth=0,
             highlightthickness=1, highlightbackground=BORDER,
         )
+        self._listbox_inactive_sel = ACCENT
 
     def __init__(self, start_path: Path):
         super().__init__()
@@ -211,6 +211,10 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         )
         self._listbox.configure(yscrollcommand=self._listbox_sb.set)
         self._listbox.configure(**self._listbox_palette)
+        try:
+            self._listbox.configure(inactiveselectbackground=self._listbox_inactive_sel)
+        except tk.TclError:
+            pass
         self._browser_frame.columnconfigure(1, weight=0)
         self._listbox.grid(row=4, column=0, sticky="nsew")
         self._listbox_sb.grid(row=4, column=1, sticky="ns")

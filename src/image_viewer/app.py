@@ -36,6 +36,8 @@ from .settings_store import (
     DEFAULT_HOTKEYS,
     load as load_settings,
     save as save_settings,
+    AUTOPLAY_MS_MIN,
+    AUTOPLAY_MS_MAX,
 )
 from .sorting_rules import resolve_destination
 from .sources import FolderSource, ImageEntry, ImageSource, SourceError, SUPPORTED_EXTS, ZIP_EXT, ZipSource
@@ -96,6 +98,7 @@ Divers
   g / j / t      etiqueter image courante (garder/jeter/a_trier) en diaporama
   e              exporter les etiquettes review (json+csv)
   r              en mode tri: appliquer une regle auto (dry-run + confirmation)
+  F5             recharger le dossier courant (navigation)
 """
 
 
@@ -118,7 +121,7 @@ class App(tk.Tk):
         self._current_image_info: Optional[dict[str, str]] = None
 
         self._autoplay = False
-        self._autoplay_ms = 2500
+        self._autoplay_ms = self._settings.autoplay_ms
         self._autoplay_job: Optional[str] = None
 
         self._nav_drain_scheduled = False
@@ -252,6 +255,7 @@ class App(tk.Tk):
         self.bind("<Shift-Key-8>", self._on_star)
         self.bind("f", self._on_fullscreen_toggle)
         self.bind("l", self._on_log_overlay)
+        self.bind("<F5>", self._on_reload_browser)
         self.bind("g", self._on_review_keep)
         self.bind("j", self._on_review_drop)
         self.bind("t", self._on_review_todo)
@@ -446,10 +450,9 @@ class App(tk.Tk):
         if dest is None:
             self._set_status("Aucune regle de tri ne correspond a cette source.")
             return
-        self._toast.show(f"[dry-run] regle: {self._organize_source.name} -> {dest}")
         if not messagebox.askyesno(
             "Mode tri",
-            f"Appliquer la regle auto vers:\n{dest}\n\nExecuter maintenant ?",
+            f"Regle auto: {self._organize_source.name} -> {dest}\n\nAppliquer maintenant ?",
         ):
             return
         if not dest.exists() or not dest.is_dir():
@@ -651,6 +654,12 @@ class App(tk.Tk):
             msg += " (ecrasement)"
         self._toast.show(msg)
 
+    def _on_reload_browser(self, _evt=None):
+        if self._mode == "browser":
+            self._refresh_browser()
+            self._toast.show("Dossier recharge")
+        return "break"
+
     def _on_close_window(self) -> None:
         if self._resize_debounce_job is not None:
             try:
@@ -745,6 +754,8 @@ class App(tk.Tk):
         self._hide_log_overlay()
         tk.Misc.lower(self._canvas)
         self._browser_frame.lift()
+        self._filter_var.set(self._browser_filter_query)
+        self.title(f"{self._browser_dir.name} — {self._base_window_title}")
 
         try:
             self._path_label.config(text=str(self._browser_dir))
@@ -899,6 +910,7 @@ class App(tk.Tk):
         self._slideshow = SlideshowState(source=src, images=images, index=clamp_index(index, len(images)))
         self._mode = "slideshow"
         self._slideshow_view = "image"
+        self.title(f"{src.container_dir().name} — {self._base_window_title}")
         self._browser_frame.lower()
         self._gallery.unbind_interaction()
         self._gallery_outer.lower()
@@ -1066,8 +1078,6 @@ class App(tk.Tk):
         return "\n".join(lines)
 
     def _show_help_overlay(self) -> None:
-        if self._mode != "slideshow":
-            return
         self._hide_log_overlay()
         self._help_label.config(text=self._help_text_with_context())
         self._help_overlay.grid(row=0, column=0, sticky="nsew", padx=24, pady=24)
@@ -1371,7 +1381,9 @@ class App(tk.Tk):
             return "break"
         if self._mode != "slideshow":
             return None
-        self._autoplay_ms = max(250, self._autoplay_ms - 250)
+        self._autoplay_ms = max(AUTOPLAY_MS_MIN, self._autoplay_ms - 250)
+        self._settings.autoplay_ms = self._autoplay_ms
+        self._schedule_save_settings()
         if self._autoplay:
             self._schedule_autoplay()
         self._set_status(f"Vitesse auto: {self._autoplay_ms} ms")
@@ -1388,15 +1400,15 @@ class App(tk.Tk):
             return "break"
         if self._mode != "slideshow":
             return None
-        self._autoplay_ms = min(20000, self._autoplay_ms + 250)
+        self._autoplay_ms = min(AUTOPLAY_MS_MAX, self._autoplay_ms + 250)
+        self._settings.autoplay_ms = self._autoplay_ms
+        self._schedule_save_settings()
         if self._autoplay:
             self._schedule_autoplay()
         self._set_status(f"Vitesse auto: {self._autoplay_ms} ms")
         return None
 
     def _on_help(self, _evt=None) -> str:
-        if self._mode != "slideshow":
-            return "break"
         if self._help_visible():
             self._hide_help_overlay()
         else:
@@ -1448,7 +1460,11 @@ class App(tk.Tk):
         writer.writerow(["entry", "label"])
         writer.writerows(sorted(self._review_labels.items()))
         out_csv.write_text(buf.getvalue(), encoding="utf-8")
-        self._toast.show(f"Export review: {out_json.name} / {out_csv.name}")
+        try:
+            display = str(out_json.relative_to(Path.cwd()))
+        except ValueError:
+            display = str(out_json)
+        self._toast.show(f"Export review: {display} / {out_csv.name}")
         return "break"
 
     def _on_open_hotkeys_dialog(self, _evt=None):

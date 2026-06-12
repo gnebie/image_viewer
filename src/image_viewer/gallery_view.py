@@ -411,7 +411,7 @@ class SlideshowGalleryView(ttk.Frame):
 
     def _on_mousewheel(self, evt: tk.Event) -> None:
         delta = evt.delta
-        steps = -1 if delta > 0 else 1
+        steps = max(1, abs(delta) // 120) * (-1 if delta > 0 else 1)
         self._canvas.yview_scroll(steps, "units")
         self._sync_tiles()
 

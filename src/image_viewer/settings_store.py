@@ -61,6 +61,11 @@ def normalize_folder_shortcuts(raw: Any) -> dict[str, str]:
     return out
 
 
+AUTOPLAY_MS_MIN = 250
+AUTOPLAY_MS_MAX = 20000
+DEFAULT_AUTOPLAY_MS = 2500
+
+
 @dataclass
 class Settings:
     thumbnail_size_level: int = DEFAULT_THUMBNAIL_LEVEL
@@ -68,12 +73,14 @@ class Settings:
     onboarding_done: bool = False
     hotkeys: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_HOTKEYS))
     sorting_rules: list[dict[str, str]] = field(default_factory=list)
+    autoplay_ms: int = DEFAULT_AUTOPLAY_MS
 
     def clamp(self) -> None:
         self.thumbnail_size_level = max(
             THUMBNAIL_LEVEL_MIN,
             min(THUMBNAIL_LEVEL_MAX, int(self.thumbnail_size_level)),
         )
+        self.autoplay_ms = max(AUTOPLAY_MS_MIN, min(AUTOPLAY_MS_MAX, int(self.autoplay_ms)))
         self.folder_shortcuts = normalize_folder_shortcuts(self.folder_shortcuts)
         self.onboarding_done = bool(self.onboarding_done)
         self.hotkeys = normalize_hotkeys(self.hotkeys)
@@ -129,6 +136,7 @@ def load(cwd: Path | None = None) -> Settings:
         onboarding_done=bool(raw.get("onboarding_done", False)),
         hotkeys=normalize_hotkeys(raw.get("hotkeys")),
         sorting_rules=raw.get("sorting_rules") if isinstance(raw.get("sorting_rules"), list) else [],
+        autoplay_ms=_coerce_int(raw.get("autoplay_ms"), DEFAULT_AUTOPLAY_MS),
     )
     s.clamp()
     return s

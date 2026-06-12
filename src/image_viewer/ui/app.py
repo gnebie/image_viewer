@@ -472,37 +472,59 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
     def _on_listbox_up(self, _evt=None):
         if self._dismiss_help_on_command():
             return "break"
-        self._move_selection(-1)
+        if self._gallery_move(-1, 0):
+            return "break"
+        if self._mode == "browser":
+            self._move_selection(-1)
+        elif self._mode == "slideshow":
+            self._queue_navigation("first")
         return "break"
 
     def _on_listbox_down(self, _evt=None):
         if self._dismiss_help_on_command():
             return "break"
-        self._move_selection(+1)
+        if self._gallery_move(1, 0):
+            return "break"
+        if self._mode == "browser":
+            self._move_selection(+1)
+        elif self._mode == "slideshow":
+            self._queue_navigation("last")
         return "break"
 
     def _on_listbox_home(self, _evt=None):
         if self._dismiss_help_on_command():
             return "break"
-        self._move_selection(-len(self._browser_items))
+        if self._mode == "browser":
+            self._move_selection(-len(self._browser_items))
         return "break"
 
     def _on_listbox_end(self, _evt=None):
         if self._dismiss_help_on_command():
             return "break"
-        self._move_selection(len(self._browser_items))
+        if self._mode == "browser":
+            self._move_selection(len(self._browser_items))
         return "break"
 
     def _on_listbox_left(self, _evt=None):
         if self._dismiss_help_on_command():
             return "break"
-        self._go_parent()
+        if self._gallery_move(0, -1):
+            return "break"
+        if self._mode == "browser":
+            self._go_parent()
+        elif self._mode == "slideshow":
+            self._queue_navigation("prev")
         return "break"
 
     def _on_listbox_right(self, _evt=None):
         if self._dismiss_help_on_command():
             return "break"
-        self._enter_selected()
+        if self._gallery_move(0, 1):
+            return "break"
+        if self._mode == "browser":
+            self._enter_selected()
+        elif self._mode == "slideshow":
+            self._queue_navigation("next")
         return "break"
 
     def _on_enter(self, _evt=None):

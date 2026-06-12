@@ -185,6 +185,7 @@ class OrganizeMixin:
         self._update_organize_help_panel()
         self._update_organize_panel()
         self._set_organize_browser_status()
+        self._update_shortcuts_display()
         self._organize_panel.grid(row=5, column=0, sticky="ew", pady=(0, 6))  # type: ignore[attr-defined]
         self._update_mode_banner()  # type: ignore[attr-defined]
         self._render_organize_highlights()
@@ -294,6 +295,15 @@ class OrganizeMixin:
         self._settings.clamp()  # type: ignore[attr-defined]
         self._schedule_save_settings()  # type: ignore[attr-defined]
         self._set_status(f"Raccourci dossier {digit} enregistre pour ce repertoire.")  # type: ignore[attr-defined]
+        self._update_shortcuts_display()
+
+    def _update_shortcuts_display(self) -> None:
+        shortcuts = self._settings.folder_shortcuts  # type: ignore[attr-defined]
+        if not shortcuts:
+            self._shortcuts_label.config(text="Raccourcis: aucun (Ctrl+Shift+chiffre pour enregistrer)")  # type: ignore[attr-defined]
+            return
+        parts = [f"{k}: {Path(v).name}" for k, v in sorted(shortcuts.items())]
+        self._shortcuts_label.config(text="Raccourcis: " + "  ".join(parts))  # type: ignore[attr-defined]
 
     def _organize_focus_list_after_operation(self, dest_dir: Path, final_name: str) -> None:
         target = dest_dir / final_name

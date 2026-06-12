@@ -30,6 +30,7 @@ from .settings_store import (
 from .slideshow_mixin import SlideshowMixin
 from .sources import SUPPORTED_EXTS, ZIP_EXT
 from .toast import ToastOverlay
+from .tooltip import ToolTip
 
 logger = logging.getLogger("image_viewer.app")
 
@@ -68,6 +69,7 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         self._nav_drain_scheduled = False
         self._initial_geometry_applied = False
         self._resize_debounce_job: Optional[str] = None
+        self._escape_arm_job: Optional[str] = None
 
         self._slideshow_view: SlideshowView = "image"
         self._gallery_saved_index: int = 0
@@ -114,13 +116,29 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         self._mode_hint = ttk.Label(self._browser_frame, text="", anchor="w")
         self._mode_hint.grid(row=1, column=0, sticky="ew", pady=(0, 6))
 
-        self._path_label = ttk.Label(self._browser_frame, text="")
-        self._path_label.grid(row=2, column=0, sticky="ew", pady=(0, 6))
+        self._breadcrumb_frame = ttk.Frame(self._browser_frame)
+        self._breadcrumb_frame.grid(row=2, column=0, sticky="ew", pady=(0, 6))
+        self._breadcrumb_widgets: list[ttk.Label] = []
+
+        self._filter_sort_frame = ttk.Frame(self._browser_frame)
+        self._filter_sort_frame.grid(row=3, column=0, sticky="ew", pady=(0, 6))
+        self._filter_sort_frame.columnconfigure(0, weight=1)
 
         self._filter_var = tk.StringVar(value="")
-        self._filter_entry = ttk.Entry(self._browser_frame, textvariable=self._filter_var)
-        self._filter_entry.grid(row=3, column=0, sticky="ew", pady=(0, 6))
+        self._filter_entry = ttk.Entry(self._filter_sort_frame, textvariable=self._filter_var)
+        self._filter_entry.grid(row=0, column=0, sticky="ew")
         self._filter_entry.bind("<KeyRelease>", self._on_filter_changed)
+
+        self._sort_var = tk.StringVar(value=self._settings.sort_mode)
+        self._sort_combo = ttk.Combobox(
+            self._filter_sort_frame,
+            textvariable=self._sort_var,
+            values=["name_asc", "name_desc", "date_asc", "date_desc"],
+            state="readonly",
+            width=12,
+        )
+        self._sort_combo.grid(row=0, column=1, padx=(6, 0))
+        self._sort_combo.bind("<<ComboboxSelected>>", self._on_sort_changed)
 
         self._organize_panel = ttk.LabelFrame(self._browser_frame, text="Mode tri")
         self._organize_help = ttk.Label(
@@ -129,6 +147,10 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         self._organize_help.grid(row=0, column=0, sticky="ew", padx=6, pady=4)
         self._organize_state_label = ttk.Label(self._organize_panel, text="", anchor="w")
         self._organize_state_label.grid(row=1, column=0, sticky="ew", padx=6, pady=(0, 4))
+        self._shortcuts_label = ttk.Label(
+            self._organize_panel, text="", justify="left", anchor="nw"
+        )
+        self._shortcuts_label.grid(row=2, column=0, sticky="ew", padx=6, pady=(0, 4))
 
         self._listbox = tk.Listbox(self._browser_frame, activestyle="none")
         self._listbox_sb = ttk.Scrollbar(
@@ -161,6 +183,8 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         self._btn_next = ttk.Button(self._bottom, text="Suivant →", command=self.next_action)
         self._btn_prev.grid(row=0, column=0, padx=(0, 6))
         self._btn_next.grid(row=0, column=1, padx=(0, 12))
+        ToolTip(self._btn_prev, "Image precedente  ←")
+        ToolTip(self._btn_next, "Image suivante  →")
 
         self._status = ttk.Label(self._bottom, text="", anchor="w")
         self._status.grid(row=0, column=2, sticky="ew")
@@ -191,6 +215,7 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         self.bind("<Shift-Key-8>", self._on_star)
         self.bind("f", self._on_fullscreen_toggle)
         self.bind("l", self._on_log_overlay)
+        self.bind("n", self._on_gallery_goto)
         self.bind("<F5>", self._on_reload_browser)
         self.bind("g", self._on_review_keep)
         self.bind("j", self._on_review_drop)
@@ -286,6 +311,13 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
     def _set_initial_window_geometry(self) -> None:
         if self._initial_geometry_applied:
             return
+        if self._settings.window_geometry:
+            try:
+                self.geometry(self._settings.window_geometry)
+                self._initial_geometry_applied = True
+                return
+            except tk.TclError:
+                pass
         screen_w = max(1, self.winfo_screenwidth())
         screen_h = max(1, self.winfo_screenheight())
         target_w = min(max(960, int(screen_w * 0.78)), int(screen_w * 0.92))
@@ -308,6 +340,10 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
             except tk.TclError:
                 pass
             self._resize_debounce_job = None
+        try:
+            self._settings.window_geometry = self.geometry()
+        except tk.TclError:
+            pass
         self._flush_save_settings()
         self._close_slideshow()
         self.destroy()
@@ -434,6 +470,13 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
             self._move_selection(len(self._browser_items))
         return None
 
+    def _arm_quit(self) -> None:
+        self._toast.show("Appuyez a nouveau sur Esc pour quitter", ms=1500)
+        self._escape_arm_job = self.after(1600, self._disarm_quit)
+
+    def _disarm_quit(self) -> None:
+        self._escape_arm_job = None
+
     def _on_escape(self, _evt=None):
         if self._dismiss_help_on_command():
             return "break"
@@ -447,7 +490,15 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
             self._set_status("Mode navigation: ↑↓ selectionner, →/Entree ouvrir, ← remonter, filtre actif, Esc quitter")
             return "break"
         else:
-            self.destroy()
+            if self._escape_arm_job is not None:
+                try:
+                    self.after_cancel(self._escape_arm_job)
+                except tk.TclError:
+                    pass
+                self._escape_arm_job = None
+                self.destroy()
+            else:
+                self._arm_quit()
         return None
 
     def _on_page_up(self, _evt=None):

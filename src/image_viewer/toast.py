@@ -11,9 +11,11 @@ class ToastOverlay:
         self._parent = parent
         self._job: str | None = None
         self._frame = ttk.Frame(parent, padding=(10, 6))
-        self._label = ttk.Label(self._frame, text="")
+        self._label = ttk.Label(self._frame, text="", cursor="hand2")
         self._label.grid(row=0, column=0, sticky="w")
         self._frame.place_forget()
+        self._frame.bind("<Button-1>", lambda _e: self.hide())
+        self._label.bind("<Button-1>", lambda _e: self.hide())
 
     def show(self, text: str, *, ms: int = 3000) -> None:
         if self._job is not None:

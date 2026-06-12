@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import simpledialog, ttk
 
 from PIL import Image, ImageTk
 
@@ -159,6 +159,24 @@ class SlideshowMixin:
 
         return None
 
+    def _on_gallery_goto(self, _evt=None) -> str:
+        if self._slideshow is None or self._mode != "slideshow":  # type: ignore[attr-defined]
+            return "break"
+        total = len(self._slideshow.images)  # type: ignore[attr-defined]
+        if total == 0:
+            return "break"
+        n = simpledialog.askinteger(
+            "Aller a",
+            f"Numero d'image (1 – {total}) :",
+            minvalue=1,
+            maxvalue=total,
+            parent=self,  # type: ignore[arg-type]
+        )
+        if n is not None:
+            self._slideshow.index = n - 1  # type: ignore[attr-defined]
+            self._show_current_image()
+        return "break"
+
     def _show_current_image(self) -> None:
         if self._slideshow is None:  # type: ignore[attr-defined]
             return
@@ -182,14 +200,35 @@ class SlideshowMixin:
             self._help_label.config(text=self._help_text_with_context())  # type: ignore[attr-defined]
         name = entry.display_name()
         pos = self._slideshow.index + 1  # type: ignore[attr-defined]
+        source_name = self._slideshow.source.display_name()  # type: ignore[attr-defined]
+        self.title(f"{source_name} [{pos}/{total}] — {self._base_window_title}")  # type: ignore[attr-defined]
         extra = f" - (skip: {skip_error})" if skip_error else ""
         key = f"{entry.path}|{entry.member or ''}"
         review = self._review_labels.get(key, "-")  # type: ignore[attr-defined]
         self._set_status(f"{pos}/{total} - {name}{extra} [review={review}]")  # type: ignore[attr-defined]
 
+    _EXIF_TAGS: dict[int, str] = {
+        271: "exif_fabricant",
+        272: "exif_modele",
+        306: "exif_date",
+        36867: "exif_date_prise",
+        33434: "exif_exposition",
+        33437: "exif_ouverture",
+        34855: "exif_iso",
+    }
+
     def _build_current_image_info(self, entry: ImageEntry, img: Image.Image) -> dict[str, str]:
         info = self._slideshow.source.describe_entry(entry) if self._slideshow is not None else {}  # type: ignore[attr-defined]
         info["size"] = f"{img.width}x{img.height}"
+        try:
+            exif = img.getexif()
+            if exif:
+                for tag_id, key in self._EXIF_TAGS.items():
+                    val = exif.get(tag_id)
+                    if val is not None:
+                        info[key] = str(val)
+        except Exception:
+            pass
         return info
 
     def _render_image_fit(self, img: Image.Image) -> None:
@@ -343,6 +382,24 @@ class SlideshowMixin:
                 lines.append(f"  Zip            {info['zip_path']}")
             if info.get("zip_member"):
                 lines.append(f"  Entree zip     {info['zip_member']}")
+            _EXIF_DISPLAY: list[tuple[str, str]] = [
+                ("exif_fabricant", "Fabricant"),
+                ("exif_modele", "Modele"),
+                ("exif_date_prise", "Date prise"),
+                ("exif_date", "Date modif"),
+                ("exif_exposition", "Exposition"),
+                ("exif_ouverture", "Ouverture"),
+                ("exif_iso", "ISO"),
+            ]
+            exif_lines = [
+                f"  {label:<16} {info[key]}"
+                for key, label in _EXIF_DISPLAY
+                if info.get(key)
+            ]
+            if exif_lines:
+                lines.append("")
+                lines.append("EXIF")
+                lines.extend(exif_lines)
         return "\n".join(lines)
 
     def _show_help_overlay(self) -> None:

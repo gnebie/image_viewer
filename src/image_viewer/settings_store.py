@@ -74,6 +74,8 @@ class Settings:
     hotkeys: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_HOTKEYS))
     sorting_rules: list[dict[str, str]] = field(default_factory=list)
     autoplay_ms: int = DEFAULT_AUTOPLAY_MS
+    sort_mode: str = "name_asc"
+    window_geometry: str = ""
 
     def clamp(self) -> None:
         self.thumbnail_size_level = max(
@@ -84,6 +86,10 @@ class Settings:
         self.folder_shortcuts = normalize_folder_shortcuts(self.folder_shortcuts)
         self.onboarding_done = bool(self.onboarding_done)
         self.hotkeys = normalize_hotkeys(self.hotkeys)
+        if self.sort_mode not in {"name_asc", "name_desc", "date_asc", "date_desc"}:
+            self.sort_mode = "name_asc"
+        if not isinstance(self.window_geometry, str):
+            self.window_geometry = ""
         if not isinstance(self.sorting_rules, list):
             self.sorting_rules = []
         cleaned_rules: list[dict[str, str]] = []
@@ -137,6 +143,8 @@ def load(cwd: Path | None = None) -> Settings:
         hotkeys=normalize_hotkeys(raw.get("hotkeys")),
         sorting_rules=raw.get("sorting_rules") if isinstance(raw.get("sorting_rules"), list) else [],
         autoplay_ms=_coerce_int(raw.get("autoplay_ms"), DEFAULT_AUTOPLAY_MS),
+        sort_mode=raw.get("sort_mode", "name_asc") if isinstance(raw.get("sort_mode"), str) else "name_asc",
+        window_geometry=raw.get("window_geometry", "") if isinstance(raw.get("window_geometry"), str) else "",
     )
     s.clamp()
     return s

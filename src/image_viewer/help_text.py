@@ -19,6 +19,7 @@ Diaporama
   Down           derniere image
   Page_Up        galerie miniatures (depuis l'image)
   Page_Down      (image) sans effet ; (galerie) ouvrir l'image selectionnee
+  n              aller a l'image numero N (dialogue)
   Space          autoplay on/off
   + / -          vitesse autoplay (image) ; taille vignettes (galerie)
   *              taille vignettes par defaut (galerie)

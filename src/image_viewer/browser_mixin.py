@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 import tkinter as tk
+from tkinter import ttk
 
 from .browser_filter import filter_items
 from .sources import FolderSource, ImageEntry, ImageSource, SourceError, SUPPORTED_EXTS, ZIP_EXT, ZipSource
@@ -21,6 +22,38 @@ class BrowserMixin:
         self._browser_filter_query = self._filter_var.get()  # type: ignore[attr-defined]
         self._refresh_browser()
 
+    def _on_sort_changed(self, _evt=None) -> None:
+        self._settings.sort_mode = self._sort_var.get()  # type: ignore[attr-defined]
+        self._schedule_save_settings()  # type: ignore[attr-defined]
+        self._refresh_browser()
+
+    def _update_breadcrumb(self) -> None:
+        frame = self._breadcrumb_frame  # type: ignore[attr-defined]
+        for w in self._breadcrumb_widgets:  # type: ignore[attr-defined]
+            w.destroy()
+        self._breadcrumb_widgets.clear()  # type: ignore[attr-defined]
+
+        parts = list(self._browser_dir.parts)  # type: ignore[attr-defined]
+        col = 0
+        for i, part in enumerate(parts):
+            path_up_to = Path(*parts[: i + 1])
+            label = ttk.Label(frame, text=part, cursor="hand2", foreground="#4a90d9")
+            label.grid(row=0, column=col, sticky="w")
+            label.bind("<Button-1>", lambda _e, p=path_up_to: self._breadcrumb_navigate(p))
+            self._breadcrumb_widgets.append(label)  # type: ignore[attr-defined]
+            col += 1
+            if i < len(parts) - 1:
+                sep = ttk.Label(frame, text=" / ")
+                sep.grid(row=0, column=col, sticky="w")
+                self._breadcrumb_widgets.append(sep)  # type: ignore[attr-defined]
+                col += 1
+
+    def _breadcrumb_navigate(self, path: Path) -> None:
+        if path.is_dir():
+            self._browser_dir = path  # type: ignore[attr-defined]
+            self._browser_selection = 0  # type: ignore[attr-defined]
+            self._refresh_browser()
+
     def _refresh_browser(self) -> None:
         self._mode = "browser"  # type: ignore[attr-defined]
         self._slideshow_view = "image"  # type: ignore[attr-defined]
@@ -34,7 +67,7 @@ class BrowserMixin:
         self.title(f"{self._browser_dir.name} — {self._base_window_title}")  # type: ignore[attr-defined]
 
         try:
-            self._path_label.config(text=str(self._browser_dir))  # type: ignore[attr-defined]
+            self._update_breadcrumb()
             items: list[Path] = []
             for p in self._browser_dir.iterdir():  # type: ignore[attr-defined]
                 if p.is_dir():
@@ -43,7 +76,24 @@ class BrowserMixin:
                     ext = p.suffix.lower()
                     if ext == ZIP_EXT or ext in SUPPORTED_EXTS:
                         items.append(p)
-            items.sort(key=lambda p: (0 if p.is_dir() else 1, p.name.lower()))
+
+            sort_mode = self._settings.sort_mode  # type: ignore[attr-defined]
+            reverse = sort_mode.endswith("_desc")
+            dirs = [p for p in items if p.is_dir()]
+            files = [p for p in items if not p.is_dir()]
+            if sort_mode.startswith("date"):
+                def _mtime(p: Path) -> float:
+                    try:
+                        return p.stat().st_mtime
+                    except OSError:
+                        return 0.0
+                dirs.sort(key=_mtime, reverse=reverse)
+                files.sort(key=_mtime, reverse=reverse)
+            else:
+                dirs.sort(key=lambda p: p.name.lower(), reverse=reverse)
+                files.sort(key=lambda p: p.name.lower(), reverse=reverse)
+            items = dirs + files
+
             self._browser_items_all = items  # type: ignore[attr-defined]
             self._browser_items = filter_items(items, self._browser_filter_query)  # type: ignore[attr-defined]
 
@@ -72,8 +122,11 @@ class BrowserMixin:
                 self._update_organize_panel()  # type: ignore[attr-defined]
                 self._set_organize_browser_status()  # type: ignore[attr-defined]
             else:
+                n = len(self._browser_items)  # type: ignore[attr-defined]
+                n_all = len(self._browser_items_all)  # type: ignore[attr-defined]
+                count = f"{n}/{n_all}" if self._browser_filter_query else str(n)  # type: ignore[attr-defined]
                 self._set_status(  # type: ignore[attr-defined]
-                    "Mode navigation: ↑↓ selectionner, →/Entree ouvrir, ← remonter, filtre actif, Esc quitter"
+                    f"{count} elements — ↑↓ selectionner, →/Entree ouvrir, ← remonter, filtre, Esc quitter"
                 )
             self._update_mode_banner()  # type: ignore[attr-defined]
             self._render_organize_highlights()  # type: ignore[attr-defined]

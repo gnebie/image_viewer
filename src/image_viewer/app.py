@@ -152,11 +152,19 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         )
         self._shortcuts_label.grid(row=2, column=0, sticky="ew", padx=6, pady=(0, 4))
 
-        self._listbox = tk.Listbox(self._browser_frame, activestyle="none")
+        self._listbox = tk.Listbox(self._browser_frame, activestyle="none", exportselection=0)
         self._listbox_sb = ttk.Scrollbar(
             self._browser_frame, orient="vertical", command=self._listbox.yview
         )
         self._listbox.configure(yscrollcommand=self._listbox_sb.set)
+        # On Linux, inactiveselectbackground defaults to "" which makes the
+        # selection invisible whenever the listbox loses focus.  Mirror the
+        # focused colour so the highlight is always visible.
+        try:
+            sel_bg = str(self._listbox.cget("selectbackground"))
+            self._listbox.configure(inactiveselectbackground=sel_bg)
+        except tk.TclError:
+            pass
         self._browser_frame.columnconfigure(1, weight=0)
         self._listbox.grid(row=4, column=0, sticky="nsew")
         self._listbox_sb.grid(row=4, column=1, sticky="ns")
@@ -244,7 +252,7 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
             self._schedule_save_settings()
         self._refresh_browser()
         self.after(10, lambda: self._auto_open_start(start_path))
-        self.after(50, lambda: self._mode == "browser" and self._listbox.focus_set())
+        self.after(300, lambda: self._mode == "browser" and self._listbox.focus_set())
 
     # ------------------------------------------------------------------ #
     # Startup                                                             #

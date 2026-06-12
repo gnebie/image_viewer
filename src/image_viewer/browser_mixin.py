@@ -179,6 +179,7 @@ class BrowserMixin:
             min(self._browser_selection + delta, len(self._browser_items) - 1),  # type: ignore[attr-defined]
         )
         self._apply_listbox_selection()
+        self._listbox.focus_set()  # type: ignore[attr-defined]
         if self._organize_active:  # type: ignore[attr-defined]
             if (
                 self._organize_pending_dest is not None  # type: ignore[attr-defined]

@@ -102,7 +102,7 @@ def execute_move_or_copy(src: Path, dest_dir: Path, *, copy: bool) -> Path:
 
     Kept for tests and callers that do not need overwrite semantics.
     """
-    final_name = unique_destination_path(dest_dir, src.name)
-    if final_name.name != src.name:
-        logger.info("Organize: collision renommage vers %s", final_name.name)
-    return execute_move_or_copy_to_final(src, final_name, copy=copy)
+    final_dest = unique_destination_path(dest_dir, src.name)
+    if final_dest.name != src.name:
+        logger.info("Organize: collision renommage vers %s", final_dest.name)
+    return execute_move_or_copy_to_final(src, final_dest, copy=copy)

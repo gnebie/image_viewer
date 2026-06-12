@@ -13,6 +13,14 @@ from PIL import Image, ImageTk
 
 from .help_text import HELP_TEXT
 from .settings_store import DEFAULT_HOTKEYS
+
+_HOTKEY_LABELS: dict[str, str] = {
+    "enter_organize_mode": "Activer le mode tri",
+    "organize_target_image": "Cible : images",
+    "organize_target_zip": "Cible : zip / dossiers",
+    "organize_op_move": "Opération : déplacer",
+    "organize_op_copy": "Opération : copier",
+}
 from .slideshow import NavigationCommand, SlideshowState, apply_navigation, clamp_index
 from .sources import ImageEntry, ImageSource, SourceError
 
@@ -230,6 +238,7 @@ class SlideshowMixin:
             self._browser_dir = container  # type: ignore[attr-defined]
         self._autoplay = False  # type: ignore[attr-defined]
         self._refresh_browser()  # type: ignore[attr-defined]
+        self.after_idle(self._listbox.focus_set)  # type: ignore[attr-defined]
 
     # ------------------------------------------------------------------ #
     # Navigation queue                                                    #
@@ -361,14 +370,6 @@ class SlideshowMixin:
     # Hotkeys dialog                                                      #
     # ------------------------------------------------------------------ #
 
-    _HOTKEY_LABELS: dict[str, str] = {
-        "enter_organize_mode": "Activer le mode tri",
-        "organize_target_image": "Cible : images",
-        "organize_target_zip": "Cible : zip / dossiers",
-        "organize_op_move": "Opération : déplacer",
-        "organize_op_copy": "Opération : copier",
-    }
-
     def _on_open_hotkeys_dialog(self, _evt=None):
         win = tk.Toplevel(self)  # type: ignore[arg-type]
         win.title("Raccourcis clavier")
@@ -378,7 +379,7 @@ class SlideshowMixin:
         outer.grid(row=0, column=0, sticky="nsew")
         rows: dict[str, ttk.Entry] = {}
         for r, (action, default_key) in enumerate(DEFAULT_HOTKEYS.items()):
-            label = self._HOTKEY_LABELS.get(action, action)
+            label = _HOTKEY_LABELS.get(action, action)
             ttk.Label(outer, text=label).grid(row=r, column=0, sticky="w", padx=(0, 8), pady=2)
             ent = ttk.Entry(outer, width=8)
             ent.insert(0, self._settings.hotkeys.get(action, default_key))  # type: ignore[attr-defined]

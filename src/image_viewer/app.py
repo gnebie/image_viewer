@@ -253,13 +253,16 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
     # Settings persistence                                                #
     # ------------------------------------------------------------------ #
 
-    def _schedule_save_settings(self) -> None:
+    def _cancel_save_job(self) -> None:
         if self._settings_save_job is not None:
             try:
                 self.after_cancel(self._settings_save_job)
             except tk.TclError:
                 pass
             self._settings_save_job = None
+
+    def _schedule_save_settings(self) -> None:
+        self._cancel_save_job()
         self._settings_save_job = self.after(450, self._timed_save_settings)
 
     def _timed_save_settings(self) -> None:
@@ -273,12 +276,7 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
             logger.warning("Could not save settings: %s", e)
 
     def _flush_save_settings(self) -> None:
-        if self._settings_save_job is not None:
-            try:
-                self.after_cancel(self._settings_save_job)
-            except tk.TclError:
-                pass
-            self._settings_save_job = None
+        self._cancel_save_job()
         self._persist_settings_now()
 
     # ------------------------------------------------------------------ #
@@ -314,7 +312,9 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         self._close_slideshow()
         self.destroy()
 
-    def _on_resize(self, _evt=None) -> None:
+    def _on_resize(self, evt=None) -> None:
+        if evt is not None and evt.widget is not self:
+            return
         if self._resize_debounce_job is not None:
             try:
                 self.after_cancel(self._resize_debounce_job)
@@ -330,12 +330,18 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
     # Button actions                                                      #
     # ------------------------------------------------------------------ #
 
+    def _gallery_move(self, row_delta: int, col_delta: int) -> bool:
+        """Move gallery selection. Returns True if gallery consumed the event."""
+        if not (self._is_gallery_active() and self._slideshow is not None):
+            return False
+        cols = self._gallery.column_count
+        total = len(self._slideshow.images)
+        idx = move_gallery_index(self._gallery.get_selection(), total, cols, row_delta, col_delta)
+        self._gallery.set_selection(idx)
+        return True
+
     def prev_action(self) -> None:
-        if self._is_gallery_active() and self._slideshow is not None:
-            cols = self._gallery.column_count
-            total = len(self._slideshow.images)
-            idx = move_gallery_index(self._gallery.get_selection(), total, cols, 0, -1)
-            self._gallery.set_selection(idx)
+        if self._gallery_move(0, -1):
             return
         if self._mode == "slideshow":
             self._queue_navigation("prev")
@@ -343,11 +349,7 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
             self._go_parent()
 
     def next_action(self) -> None:
-        if self._is_gallery_active() and self._slideshow is not None:
-            cols = self._gallery.column_count
-            total = len(self._slideshow.images)
-            idx = move_gallery_index(self._gallery.get_selection(), total, cols, 0, 1)
-            self._gallery.set_selection(idx)
+        if self._gallery_move(0, 1):
             return
         if self._mode == "slideshow":
             self._queue_navigation("next")
@@ -361,11 +363,7 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
     def _on_left(self, _evt=None):
         if self._dismiss_help_on_command():
             return "break"
-        if self._is_gallery_active() and self._slideshow is not None:
-            cols = self._gallery.column_count
-            total = len(self._slideshow.images)
-            idx = move_gallery_index(self._gallery.get_selection(), total, cols, 0, -1)
-            self._gallery.set_selection(idx)
+        if self._gallery_move(0, -1):
             return "break"
         if self._mode == "slideshow":
             self._queue_navigation("prev")
@@ -376,11 +374,7 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
     def _on_right(self, _evt=None):
         if self._dismiss_help_on_command():
             return "break"
-        if self._is_gallery_active() and self._slideshow is not None:
-            cols = self._gallery.column_count
-            total = len(self._slideshow.images)
-            idx = move_gallery_index(self._gallery.get_selection(), total, cols, 0, 1)
-            self._gallery.set_selection(idx)
+        if self._gallery_move(0, 1):
             return "break"
         if self._mode == "slideshow":
             self._queue_navigation("next")
@@ -391,11 +385,7 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
     def _on_up(self, _evt=None):
         if self._dismiss_help_on_command():
             return "break"
-        if self._is_gallery_active() and self._slideshow is not None:
-            cols = self._gallery.column_count
-            total = len(self._slideshow.images)
-            idx = move_gallery_index(self._gallery.get_selection(), total, cols, -1, 0)
-            self._gallery.set_selection(idx)
+        if self._gallery_move(-1, 0):
             return "break"
         if self._mode == "browser":
             self._move_selection(-1)
@@ -406,11 +396,7 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
     def _on_down(self, _evt=None):
         if self._dismiss_help_on_command():
             return "break"
-        if self._is_gallery_active() and self._slideshow is not None:
-            cols = self._gallery.column_count
-            total = len(self._slideshow.images)
-            idx = move_gallery_index(self._gallery.get_selection(), total, cols, 1, 0)
-            self._gallery.set_selection(idx)
+        if self._gallery_move(1, 0):
             return "break"
         if self._mode == "browser":
             self._move_selection(+1)

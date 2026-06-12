@@ -16,7 +16,7 @@ def show_onboarding(parent: tk.Misc) -> None:
         "Diaporama: Left/Right pour naviguer, Page_Up pour la galerie.",
         "Mode tri: touche d pour activer, Entree en 2 temps pour confirmer.",
     ]
-    idx = {"value": 0}
+    idx = 0
 
     outer = ttk.Frame(win, padding=16)
     outer.grid(row=0, column=0, sticky="nsew")
@@ -24,20 +24,22 @@ def show_onboarding(parent: tk.Misc) -> None:
     label.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
 
     def refresh() -> None:
-        label.config(text=steps[idx["value"]])
-        prev_btn.state(["!disabled"] if idx["value"] > 0 else ["disabled"])
-        next_btn.config(text="Terminer" if idx["value"] == len(steps) - 1 else "Suivant")
+        label.config(text=steps[idx])
+        prev_btn.state(["!disabled"] if idx > 0 else ["disabled"])
+        next_btn.config(text="Terminer" if idx == len(steps) - 1 else "Suivant")
 
     def prev_step() -> None:
-        if idx["value"] > 0:
-            idx["value"] -= 1
+        nonlocal idx
+        if idx > 0:
+            idx -= 1
             refresh()
 
     def next_step() -> None:
-        if idx["value"] >= len(steps) - 1:
+        nonlocal idx
+        if idx >= len(steps) - 1:
             win.destroy()
             return
-        idx["value"] += 1
+        idx += 1
         refresh()
 
     prev_btn = ttk.Button(outer, text="Precedent", command=prev_step)

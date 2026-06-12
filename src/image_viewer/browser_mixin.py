@@ -26,6 +26,7 @@ class BrowserMixin:
         self._settings.sort_mode = self._sort_var.get()  # type: ignore[attr-defined]
         self._schedule_save_settings()  # type: ignore[attr-defined]
         self._refresh_browser()
+        self._listbox.focus_set()  # type: ignore[attr-defined]
 
     def _update_breadcrumb(self) -> None:
         frame = self._breadcrumb_frame  # type: ignore[attr-defined]
@@ -52,6 +53,7 @@ class BrowserMixin:
         if path.is_dir():
             self._browser_dir = path  # type: ignore[attr-defined]
             self._browser_selection = 0  # type: ignore[attr-defined]
+            self._organize_pending_dest = None  # type: ignore[attr-defined]
             self._refresh_browser()
 
     def _refresh_browser(self) -> None:

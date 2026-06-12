@@ -42,14 +42,20 @@ class ToolTip:
         self._job = None
         if self._tip is not None:
             return
-        x = self._widget.winfo_rootx()
-        y = self._widget.winfo_rooty() + self._widget.winfo_height() + 4
-        self._tip = tk.Toplevel(self._widget)
-        self._tip.wm_overrideredirect(True)
-        self._tip.wm_geometry(f"+{x}+{y}")
-        ttk.Label(self._tip, text=self._text, relief="solid", padding=(6, 3)).pack()
+        try:
+            x = self._widget.winfo_rootx()
+            y = self._widget.winfo_rooty() + self._widget.winfo_height() + 4
+            self._tip = tk.Toplevel(self._widget)
+            self._tip.wm_overrideredirect(True)
+            self._tip.wm_geometry(f"+{x}+{y}")
+            ttk.Label(self._tip, text=self._text, relief="solid", padding=(6, 3)).pack()
+        except tk.TclError:
+            self._tip = None
 
     def _hide(self) -> None:
         if self._tip is not None:
-            self._tip.destroy()
+            try:
+                self._tip.destroy()
+            except tk.TclError:
+                pass
             self._tip = None

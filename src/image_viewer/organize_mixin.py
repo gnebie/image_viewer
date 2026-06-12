@@ -76,6 +76,8 @@ class OrganizeMixin:
         self._log_overlay.grid_remove()  # type: ignore[attr-defined]
 
     def _on_log_overlay(self, _evt=None):
+        if self._text_input_focused():  # type: ignore[attr-defined]
+            return None
         if self._mode != "browser":  # type: ignore[attr-defined]
             return None
         if bool(self._log_overlay.winfo_ismapped()):  # type: ignore[attr-defined]
@@ -194,7 +196,7 @@ class OrganizeMixin:
         self._organize_active = False  # type: ignore[attr-defined]
         self._organize_pending_dest = None  # type: ignore[attr-defined]
         self._organize_source = None  # type: ignore[attr-defined]
-        self.title(self._base_window_title)  # type: ignore[attr-defined]
+        self.title(f"{self._browser_dir.name} — {self._base_window_title}")  # type: ignore[attr-defined]
         self._organize_panel.grid_remove()  # type: ignore[attr-defined]
         self._update_mode_banner()  # type: ignore[attr-defined]
         self._render_organize_highlights()
@@ -451,6 +453,8 @@ class OrganizeMixin:
             logger.warning("Autosave review labels: %s", e)
 
     def _on_review_keep(self, _evt=None):
+        if self._text_input_focused():  # type: ignore[attr-defined]
+            return None
         if self._mode != "slideshow":  # type: ignore[attr-defined]
             self._set_status("Review disponible uniquement en mode diaporama.")  # type: ignore[attr-defined]
             return None
@@ -458,6 +462,8 @@ class OrganizeMixin:
         return "break"
 
     def _on_review_drop(self, _evt=None):
+        if self._text_input_focused():  # type: ignore[attr-defined]
+            return None
         if self._mode != "slideshow":  # type: ignore[attr-defined]
             self._set_status("Review disponible uniquement en mode diaporama.")  # type: ignore[attr-defined]
             return None
@@ -465,6 +471,8 @@ class OrganizeMixin:
         return "break"
 
     def _on_review_todo(self, _evt=None):
+        if self._text_input_focused():  # type: ignore[attr-defined]
+            return None
         if self._mode != "slideshow":  # type: ignore[attr-defined]
             self._set_status("Review disponible uniquement en mode diaporama.")  # type: ignore[attr-defined]
             return None
@@ -472,6 +480,8 @@ class OrganizeMixin:
         return "break"
 
     def _on_review_export(self, _evt=None):
+        if self._text_input_focused():  # type: ignore[attr-defined]
+            return None
         if self._mode != "slideshow":  # type: ignore[attr-defined]
             return None
         out_json = self._cwd / "logs" / "review_labels.json"  # type: ignore[attr-defined]

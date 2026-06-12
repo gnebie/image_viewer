@@ -341,7 +341,8 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
                 pass
             self._resize_debounce_job = None
         try:
-            self._settings.window_geometry = self.geometry()
+            if not bool(self.attributes("-fullscreen")):
+                self._settings.window_geometry = self.geometry()
         except tk.TclError:
             pass
         self._flush_save_settings()
@@ -361,6 +362,15 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
 
     def _set_status(self, text: str) -> None:
         self._status.config(text=text)
+
+    def _text_input_focused(self) -> bool:
+        """True when a text-entry widget has focus — global single-key and editing
+        bindings must not fire while the user is typing in the filter or a combobox."""
+        try:
+            w = self.focus_get()
+        except (KeyError, tk.TclError):
+            return False
+        return isinstance(w, (tk.Entry, ttk.Entry, tk.Text, tk.Spinbox))
 
     # ------------------------------------------------------------------ #
     # Button actions                                                      #
@@ -397,6 +407,8 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
     # ------------------------------------------------------------------ #
 
     def _on_left(self, _evt=None):
+        if self._text_input_focused():
+            return None
         if self._dismiss_help_on_command():
             return "break"
         if self._gallery_move(0, -1):
@@ -408,6 +420,8 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         return None
 
     def _on_right(self, _evt=None):
+        if self._text_input_focused():
+            return None
         if self._dismiss_help_on_command():
             return "break"
         if self._gallery_move(0, 1):
@@ -454,6 +468,8 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         return None
 
     def _on_backspace(self, _evt=None):
+        if self._text_input_focused():
+            return None
         if self._dismiss_help_on_command():
             return "break"
         if self._mode == "browser":
@@ -461,11 +477,15 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         return None
 
     def _on_home(self, _evt=None):
+        if self._text_input_focused():
+            return None
         if self._mode == "browser":
             self._move_selection(-len(self._browser_items))
         return None
 
     def _on_end(self, _evt=None):
+        if self._text_input_focused():
+            return None
         if self._mode == "browser":
             self._move_selection(len(self._browser_items))
         return None
@@ -496,7 +516,7 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
                 except tk.TclError:
                     pass
                 self._escape_arm_job = None
-                self.destroy()
+                self._on_close_window()
             else:
                 self._arm_quit()
         return None
@@ -530,6 +550,8 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         return "break"
 
     def _on_fullscreen_toggle(self, _evt=None):
+        if self._text_input_focused():
+            return None
         try:
             is_fullscreen = bool(self.attributes("-fullscreen"))
         except tk.TclError:
@@ -594,7 +616,9 @@ class App(BrowserMixin, OrganizeMixin, SlideshowMixin, tk.Tk):
         self._set_status(f"Vitesse auto: {self._autoplay_ms} ms")
         return None
 
-    def _on_help(self, _evt=None) -> str:
+    def _on_help(self, _evt=None) -> Optional[str]:
+        if self._text_input_focused():
+            return None
         if self._help_visible():
             self._hide_help_overlay()
         else:

@@ -17,18 +17,21 @@ class ToastOverlay:
         self._frame.bind("<Button-1>", lambda _e: self.hide())
         self._label.bind("<Button-1>", lambda _e: self.hide())
 
-    def show(self, text: str, *, ms: int = 3000) -> None:
+    def _cancel_job(self) -> None:
         if self._job is not None:
             try:
                 self._parent.after_cancel(self._job)
             except tk.TclError:
                 pass
             self._job = None
+
+    def show(self, text: str, *, ms: int = 3000) -> None:
+        self._cancel_job()
         self._label.config(text=text)
         self._frame.place(relx=1.0, rely=0.0, x=-12, y=12, anchor="ne")
         self._frame.lift()
         self._job = self._parent.after(ms, self.hide)
 
     def hide(self) -> None:
-        self._job = None
+        self._cancel_job()
         self._frame.place_forget()

@@ -159,12 +159,15 @@ class SlideshowMixin:
 
         return None
 
-    def _on_gallery_goto(self, _evt=None) -> str:
+    def _on_gallery_goto(self, _evt=None) -> Optional[str]:
+        if self._text_input_focused():  # type: ignore[attr-defined]
+            return None
         if self._slideshow is None or self._mode != "slideshow":  # type: ignore[attr-defined]
             return "break"
         total = len(self._slideshow.images)  # type: ignore[attr-defined]
         if total == 0:
             return "break"
+        self._cancel_autoplay()
         n = simpledialog.askinteger(
             "Aller a",
             f"Numero d'image (1 – {total}) :",
@@ -173,8 +176,13 @@ class SlideshowMixin:
             parent=self,  # type: ignore[arg-type]
         )
         if n is not None:
-            self._slideshow.index = n - 1  # type: ignore[attr-defined]
-            self._show_current_image()
+            if self._is_gallery_active():
+                self._gallery.set_selection(n - 1)  # type: ignore[attr-defined]
+            else:
+                self._slideshow.index = n - 1  # type: ignore[attr-defined]
+                self._show_current_image()
+        if self._autoplay:  # type: ignore[attr-defined]
+            self._schedule_autoplay()
         return "break"
 
     def _show_current_image(self) -> None:
